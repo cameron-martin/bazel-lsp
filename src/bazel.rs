@@ -134,25 +134,6 @@ struct FilesystemCompletionOptions {
     targets: bool,
 }
 
-pub(crate) fn main(
-    lsp: bool,
-    print_non_none: bool,
-    is_interactive: bool,
-    prelude: &[PathBuf],
-) -> anyhow::Result<()> {
-    if !lsp {
-        return Err(anyhow::anyhow!("Bazel mode only supports `--lsp`"));
-    }
-
-    // NOTE: Copied from `main.rs`
-    let mut ctx = BazelContext::new(ContextMode::Check, print_non_none, prelude, is_interactive)?;
-
-    ctx.mode = ContextMode::Check;
-    starlark_lsp::server::stdio_server(ctx)?;
-
-    Ok(())
-}
-
 pub(crate) struct BazelContext {
     pub(crate) workspace_name: Option<String>,
     pub(crate) external_output_base: Option<PathBuf>,
