@@ -59,6 +59,7 @@ use starlark_lsp::server::LspUrl;
 use starlark_lsp::server::StringLiteralResult;
 
 use self::label::Label;
+use crate::client::BazelClient;
 use crate::eval::dialect;
 use crate::eval::globals;
 use crate::eval::ContextMode;
@@ -150,7 +151,8 @@ impl BazelContext {
     const BUILD_FILE_NAMES: [&'static str; 2] = ["BUILD", "BUILD.bazel"];
     const LOADABLE_EXTENSIONS: [&'static str; 1] = ["bzl"];
 
-    pub(crate) fn new(
+    pub(crate) fn new<Client: BazelClient>(
+        client: Client,
         mode: ContextMode,
         print_non_none: bool,
         prelude: &[PathBuf],
@@ -189,27 +191,7 @@ impl BazelContext {
             .map(|(u, ds)| (u, render_docs_as_code(&ds)))
             .collect();
 
-        let mut raw_command = Command::new("bazel");
-        let mut command = raw_command.arg("info");
-        command = command.current_dir(std::env::current_dir()?);
-
-        let output = command.output()?;
-        if !output.status.success() {
-            return Err(anyhow::anyhow!("Command `bazel info` failed"));
-        }
-
-        let output = String::from_utf8(output.stdout)?;
-        let mut execroot = None;
-        let mut output_base = None;
-        for line in output.lines() {
-            if let Some((key, value)) = line.split_once(": ") {
-                match key {
-                    "execution_root" => execroot = Some(value),
-                    "output_base" => output_base = Some(value),
-                    _ => {}
-                }
-            }
-        }
+        let info = client.info()?;
 
         Ok(Self {
             mode,
@@ -218,7 +200,7 @@ impl BazelContext {
             module,
             builtin_docs,
             builtin_symbols,
-            workspace_name: execroot.and_then(|execroot| {
+            workspace_name: info.execution_root.and_then(|execroot| {
                 match PathBuf::from(execroot)
                     .file_name()?
                     .to_string_lossy()
@@ -228,7 +210,8 @@ impl BazelContext {
                     name => Some(name),
                 }
             }),
-            external_output_base: output_base
+            external_output_base: info
+                .output_base
                 .map(|output_base| PathBuf::from(output_base).join("external")),
         })
     }
@@ -851,5 +834,98 @@ impl LspContext for BazelContext {
         }
 
         Ok(names)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{fs, io, path::{PathBuf, Path}};
+
+    use anyhow::anyhow;
+    use starlark_lsp::server::{LspContext, LspUrl};
+
+    use crate::{
+        client::{BazelInfo, MockBazel},
+        eval::ContextMode,
+    };
+
+    use super::BazelContext;
+
+    fn path_to_string<P: AsRef<Path>>(path: P) -> anyhow::Result<String> {
+        Ok(path.as_ref().to_str().ok_or_else(|| anyhow!("Cannot convert path to string"))?.into())
+    }
+
+    fn create_context() -> anyhow::Result<BazelContext> {
+        let client = MockBazel {
+            info: BazelInfo {
+                output_base: Some(path_to_string(output_base()?)?),
+                execution_root: Some(path_to_string(output_base()?.join("execroot").join("root"))?),
+            },
+        };
+
+        BazelContext::new(client, ContextMode::Check, true, &[], true)
+    }
+
+    fn output_base() -> io::Result<PathBuf>{
+        fs::canonicalize(
+            PathBuf::from(".")
+                .join("fixtures")
+                .join("output_base"))
+    }
+
+    fn workspace_root() -> io::Result<PathBuf>{
+        fs::canonicalize(
+            PathBuf::from(".")
+                .join("fixtures")
+                .join("root"))
+    }
+
+    fn external_dir(repo: &str) -> io::Result<PathBuf> {
+        Ok(output_base()?.join("external").join(repo))
+    }
+
+    #[test]
+    fn relative_resolve_load_in_external_repository() -> anyhow::Result<()> {
+        let context = create_context()?;
+
+        let url = context.resolve_load(
+            "//:foo.bzl",
+            &LspUrl::File(external_dir("foo")?.join("BUILD")),
+            None,
+        )?;
+
+        assert_eq!(url, LspUrl::File(external_dir("foo")?.join("foo.bzl")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn absolute_resolve_load_in_external_repository() -> anyhow::Result<()> {
+        let context = create_context()?;
+
+        let url = context.resolve_load(
+            "@bar//:bar.bzl",
+            &LspUrl::File(external_dir("foo")?.join("BUILD")),
+            None,
+        )?;
+
+        assert_eq!(url, LspUrl::File(external_dir("bar")?.join("bar.bzl")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn external_resolve_load_in_root_workspace() -> anyhow::Result<()> {
+        let context = create_context()?;
+
+        let url = context.resolve_load(
+            "@foo//:foo.bzl",
+            &LspUrl::File(workspace_root()?.join("BUILD")),
+            None,
+        )?;
+
+        assert_eq!(url, LspUrl::File(external_dir("foo")?.join("foo.bzl")));
+
+        Ok(())
     }
 }
