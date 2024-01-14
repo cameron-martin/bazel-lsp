@@ -839,92 +839,63 @@ impl LspContext for BazelContext {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, io, path::{PathBuf, Path}};
-
-    use anyhow::anyhow;
     use starlark_lsp::server::{LspContext, LspUrl};
 
-    use crate::{
-        client::{BazelInfo, MockBazel},
-        eval::ContextMode,
-    };
-
-    use super::BazelContext;
-
-    fn path_to_string<P: AsRef<Path>>(path: P) -> anyhow::Result<String> {
-        Ok(path.as_ref().to_str().ok_or_else(|| anyhow!("Cannot convert path to string"))?.into())
-    }
-
-    fn create_context() -> anyhow::Result<BazelContext> {
-        let client = MockBazel {
-            info: BazelInfo {
-                output_base: Some(path_to_string(output_base()?)?),
-                execution_root: Some(path_to_string(output_base()?.join("execroot").join("root"))?),
-            },
-        };
-
-        BazelContext::new(client, ContextMode::Check, true, &[], true)
-    }
-
-    fn output_base() -> io::Result<PathBuf>{
-        fs::canonicalize(
-            PathBuf::from(".")
-                .join("fixtures")
-                .join("output_base"))
-    }
-
-    fn workspace_root() -> io::Result<PathBuf>{
-        fs::canonicalize(
-            PathBuf::from(".")
-                .join("fixtures")
-                .join("root"))
-    }
-
-    fn external_dir(repo: &str) -> io::Result<PathBuf> {
-        Ok(output_base()?.join("external").join(repo))
-    }
+    use crate::test_fixture::TestFixture;
 
     #[test]
     fn relative_resolve_load_in_external_repository() -> anyhow::Result<()> {
-        let context = create_context()?;
+        let fixture = TestFixture::new("simple")?;
+        let context = fixture.context()?;
 
         let url = context.resolve_load(
             "//:foo.bzl",
-            &LspUrl::File(external_dir("foo")?.join("BUILD")),
+            &LspUrl::File(fixture.external_dir("foo").join("BUILD")),
             None,
         )?;
 
-        assert_eq!(url, LspUrl::File(external_dir("foo")?.join("foo.bzl")));
+        assert_eq!(
+            url,
+            LspUrl::File(fixture.external_dir("foo").join("foo.bzl"))
+        );
 
         Ok(())
     }
 
     #[test]
     fn absolute_resolve_load_in_external_repository() -> anyhow::Result<()> {
-        let context = create_context()?;
+        let fixture = TestFixture::new("simple")?;
+        let context = fixture.context()?;
 
         let url = context.resolve_load(
             "@bar//:bar.bzl",
-            &LspUrl::File(external_dir("foo")?.join("BUILD")),
+            &LspUrl::File(fixture.external_dir("foo").join("BUILD")),
             None,
         )?;
 
-        assert_eq!(url, LspUrl::File(external_dir("bar")?.join("bar.bzl")));
+        assert_eq!(
+            url,
+            LspUrl::File(fixture.external_dir("bar").join("bar.bzl"))
+        );
 
         Ok(())
     }
 
     #[test]
     fn external_resolve_load_in_root_workspace() -> anyhow::Result<()> {
-        let context = create_context()?;
+        let fixture = TestFixture::new("simple")?;
+        let context = fixture.context()?;
 
         let url = context.resolve_load(
             "@foo//:foo.bzl",
-            &LspUrl::File(workspace_root()?.join("BUILD")),
+            &LspUrl::File(fixture.workspace_root().join("BUILD")),
             None,
         )?;
 
-        assert_eq!(url, LspUrl::File(external_dir("foo")?.join("foo.bzl")));
+        assert_eq!(
+            url,
+            LspUrl::File(fixture.external_dir("foo").join("foo.bzl"))
+        );
 
         Ok(())
     }

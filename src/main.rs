@@ -1,6 +1,8 @@
 mod bazel;
 mod client;
 mod eval;
+#[cfg(test)]
+pub mod test_fixture;
 
 use bazel::BazelContext;
 use client::BazelCli;
