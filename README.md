@@ -4,11 +4,7 @@ This is a LSP for bazel, based off [starlark-rust](https://github.com/facebookex
 
 ## Usage
 
-Install the LSP using cargo:
-
-```sh
-cargo install bazel-lsp
-```
+Download a release from github releases and add it to your PATH.
 
 ### VSCode
 
