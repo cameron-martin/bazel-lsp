@@ -135,7 +135,7 @@ struct FilesystemCompletionOptions {
     targets: bool,
 }
 
-pub(crate) struct BazelContext {
+pub(crate) struct BazelContext<Client> {
     pub(crate) workspace_name: Option<String>,
     pub(crate) external_output_base: Option<PathBuf>,
     pub(crate) mode: ContextMode,
@@ -144,14 +144,15 @@ pub(crate) struct BazelContext {
     pub(crate) module: Option<Module>,
     pub(crate) builtin_docs: HashMap<LspUrl, String>,
     pub(crate) builtin_symbols: HashMap<String, LspUrl>,
+    pub(crate) client: Client,
 }
 
-impl BazelContext {
+impl<Client: BazelClient> BazelContext<Client> {
     const DEFAULT_WORKSPACE_NAME: &'static str = "__main__";
     const BUILD_FILE_NAMES: [&'static str; 2] = ["BUILD", "BUILD.bazel"];
     const LOADABLE_EXTENSIONS: [&'static str; 1] = ["bzl"];
 
-    pub(crate) fn new<Client: BazelClient>(
+    pub(crate) fn new(
         client: Client,
         mode: ContextMode,
         print_non_none: bool,
@@ -213,6 +214,7 @@ impl BazelContext {
             external_output_base: info
                 .output_base
                 .map(|output_base| PathBuf::from(output_base).join("external")),
+            client,
         })
     }
 
@@ -391,11 +393,33 @@ impl BazelContext {
             // name refers to the workspace, and if so, use the workspace root. If not, check
             // if it refers to a known remote repository, and if so, use that root.
             // Otherwise, fail with an error.
-            (Some(repository), _) => {
+            (Some(repository), current_file) => {
+                // If we are navigating to another repository, we need to apply the repo mapping.
+                // The repo mapping depends on the current repository, so resolve that first.
+                let current_repository = if let LspUrl::File(current_file) = current_file {
+                    if let Some((repository_name, _)) = self.get_repository_for_path(current_file) {
+                        repository_name
+                    } else {
+                        Cow::Borrowed("")
+                    }
+                } else {
+                    Cow::Borrowed("")
+                };
+
+                let repo_mapping = self
+                    .client
+                    .dump_repo_mapping(&current_repository)
+                    .unwrap_or_else(|_| HashMap::new());
+
+                let remote_repository_name = repo_mapping
+                    .get(&repository.name)
+                    .unwrap_or(&repository.name);
+
                 if matches!(self.workspace_name.as_ref(), Some(name) if name == &repository.name) {
                     workspace_root.map(Cow::Borrowed)
-                } else if let Some(remote_repository_root) =
-                    self.get_repository_path(&repository.name).map(Cow::Owned)
+                } else if let Some(remote_repository_root) = self
+                    .get_repository_path(remote_repository_name)
+                    .map(Cow::Owned)
                 {
                     Some(remote_repository_root)
                 } else {
@@ -587,7 +611,7 @@ impl BazelContext {
     }
 }
 
-impl LspContext for BazelContext {
+impl<Client: BazelClient> LspContext for BazelContext<Client> {
     fn parse_file_with_contents(&self, uri: &LspUrl, content: String) -> LspEvalResult {
         match uri {
             LspUrl::File(uri) => {
@@ -839,6 +863,7 @@ impl LspContext for BazelContext {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
     use starlark_lsp::server::{LspContext, LspUrl};
 
     use crate::test_fixture::TestFixture;
@@ -895,6 +920,37 @@ mod tests {
         assert_eq!(
             url,
             LspUrl::File(fixture.external_dir("foo").join("foo.bzl"))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn external_resolve_load_in_bzlmod_workspace() -> anyhow::Result<()> {
+        let repo_mappings = serde_json::from_value(json!({
+            "": {
+                "": "",
+                "rules_rust": "rules_rust~0.36.2",
+            },
+        }))?;
+
+        let fixture = TestFixture::new("bzlmod")?;
+        let context = fixture.context_with_repo_mappings(repo_mappings)?;
+
+        let url = context.resolve_load(
+            "@rules_rust//rust:defs.bzl",
+            &LspUrl::File(fixture.workspace_root().join("BUILD")),
+            None,
+        )?;
+
+        assert_eq!(
+            url,
+            LspUrl::File(
+                fixture
+                    .external_dir("rules_rust~0.36.2")
+                    .join("rust")
+                    .join("defs.bzl")
+            )
         );
 
         Ok(())

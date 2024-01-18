@@ -1,8 +1,16 @@
-use std::{fs, io, path::{PathBuf, Path}, collections::HashMap};
+use std::{
+    collections::HashMap,
+    fs, io,
+    path::{Path, PathBuf},
+};
 
 use anyhow::anyhow;
 
-use crate::{eval::ContextMode, bazel::BazelContext, client::{MockBazel, BazelInfo}};
+use crate::{
+    bazel::BazelContext,
+    client::{BazelInfo, MockBazel},
+    eval::ContextMode,
+};
 
 pub struct TestFixture {
     path: PathBuf,
@@ -27,12 +35,22 @@ impl TestFixture {
         self.output_base().join("external").join(repo)
     }
 
-    pub(crate) fn context(&self) -> anyhow::Result<BazelContext> {
+    pub(crate) fn context(&self) -> anyhow::Result<BazelContext<MockBazel>> {
+        self.context_with_repo_mappings(HashMap::new())
+    }
+
+    pub(crate) fn context_with_repo_mappings(
+        &self,
+        repo_mappings: HashMap<String, HashMap<String, String>>,
+    ) -> anyhow::Result<BazelContext<MockBazel>> {
         let client = MockBazel {
             info: BazelInfo {
                 output_base: Some(path_to_string(self.output_base())?),
-                execution_root: Some(path_to_string(self.output_base().join("execroot").join("root"))?),
+                execution_root: Some(path_to_string(
+                    self.output_base().join("execroot").join("root"),
+                )?),
             },
+            repo_mappings,
         };
 
         BazelContext::new(client, ContextMode::Check, true, &[], true)
@@ -40,5 +58,9 @@ impl TestFixture {
 }
 
 fn path_to_string<P: AsRef<Path>>(path: P) -> anyhow::Result<String> {
-    Ok(path.as_ref().to_str().ok_or_else(|| anyhow!("Cannot convert path to string"))?.into())
+    Ok(path
+        .as_ref()
+        .to_str()
+        .ok_or_else(|| anyhow!("Cannot convert path to string"))?
+        .into())
 }

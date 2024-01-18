@@ -1,4 +1,6 @@
-use std::process::Command;
+use std::{collections::HashMap, process::Command};
+
+use anyhow::anyhow;
 
 #[derive(Clone)]
 pub(crate) struct BazelInfo {
@@ -11,19 +13,20 @@ pub(crate) struct BazelInfo {
 /// it involves spawning a server and each invocation takes a workspace-level lock.
 pub(crate) trait BazelClient {
     fn info(&self) -> anyhow::Result<BazelInfo>;
+    fn dump_repo_mapping(&self, repo: &str) -> anyhow::Result<HashMap<String, String>>;
 }
 
 pub(crate) struct BazelCli;
 
 impl BazelClient for BazelCli {
     fn info(&self) -> anyhow::Result<BazelInfo> {
-        let mut raw_command = Command::new("bazel");
-        let mut command = raw_command.arg("info");
-        command = command.current_dir(std::env::current_dir()?);
+        let output = Command::new("bazel")
+            .arg("info")
+            .current_dir(std::env::current_dir()?)
+            .output()?;
 
-        let output = command.output()?;
         if !output.status.success() {
-            return Err(anyhow::anyhow!("Command `bazel info` failed"));
+            return Err(anyhow!("Command `bazel info` failed"));
         }
 
         let output = String::from_utf8(output.stdout)?;
@@ -44,16 +47,41 @@ impl BazelClient for BazelCli {
             output_base: output_base.map(|x| x.into()),
         })
     }
+
+    fn dump_repo_mapping(&self, repo: &str) -> anyhow::Result<HashMap<String, String>> {
+        let output = Command::new("bazel")
+            .args(["mod", "dump_repo_mapping"])
+            .arg(repo)
+            .current_dir(std::env::current_dir()?)
+            .output()?;
+
+        if !output.status.success() {
+            return Err(anyhow!(
+                "Command `bazel mod dump_repo_mapping` failed"
+            ));
+        }
+
+        Ok(serde_json::from_slice(&output.stdout)?)
+    }
 }
 
 #[cfg(test)]
 pub(crate) struct MockBazel {
     pub(crate) info: BazelInfo,
+    pub(crate) repo_mappings: HashMap<String, HashMap<String, String>>,
 }
 
 #[cfg(test)]
 impl BazelClient for MockBazel {
     fn info(&self) -> anyhow::Result<BazelInfo> {
         Ok(self.info.clone())
+    }
+
+    fn dump_repo_mapping(&self, repo: &str) -> anyhow::Result<HashMap<String, String>> {
+        Ok(self
+            .repo_mappings
+            .get(repo)
+            .ok_or_else(|| anyhow!("Cannot find repo mapping"))?
+            .clone())
     }
 }
