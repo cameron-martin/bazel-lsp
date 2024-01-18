@@ -23,9 +23,13 @@ jobs:
       - name: Build
         if: ${{ steps.release.outputs.release_created }}
         run: |
-          cargo build --release
+          VERSION=${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}
           mkdir -p releases
-          cp target/release/bazel-lsp releases/bazel-lsp-${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}-linux-amd64
+          
+          TARGET=x86_64-unknown-linux-gnu
+          rustup target add $TARGET
+          cargo build --release --target $TARGET
+          cp target/$TARGET/release/bazel-lsp releases/bazel-lsp-$VERSION-linux-amd64
       - name: Upload Release Artifacts
         if: ${{ steps.release.outputs.release_created }}
         env:
