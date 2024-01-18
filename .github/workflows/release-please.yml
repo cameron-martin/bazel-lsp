@@ -25,7 +25,7 @@ jobs:
         run: |
           cargo build --release
           mkdir -p releases
-          cp target/release/bazel-lsp releases/bazel-lsp-${{ steps.release.outputs.major }}-${{ steps.release.outputs.minor }}-${{ steps.release.outputs.patch }}-linux-amd64
+          cp target/release/bazel-lsp releases/bazel-lsp-${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}-linux-amd64
       - name: Upload Release Artifacts
         if: ${{ steps.release.outputs.release_created }}
         env:
