@@ -47,7 +47,7 @@ impl TestFixture {
             info: BazelInfo {
                 output_base: Some(path_to_string(self.output_base())?),
                 execution_root: Some(path_to_string(
-                    self.output_base().join("execroot").join("root"),
+                    self.output_base().join("execroot").join("_main"),
                 )?),
             },
             repo_mappings,

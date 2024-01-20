@@ -31,6 +31,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::io;
 use std::iter;
+use std::ops::Deref;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -148,7 +149,7 @@ pub(crate) struct BazelContext<Client> {
 }
 
 impl<Client: BazelClient> BazelContext<Client> {
-    const DEFAULT_WORKSPACE_NAME: &'static str = "__main__";
+    const DEFAULT_WORKSPACE_NAMES: [&'static str; 2] = ["__main__", "_main"];
     const BUILD_FILE_NAMES: [&'static str; 2] = ["BUILD", "BUILD.bazel"];
     const LOADABLE_EXTENSIONS: [&'static str; 1] = ["bzl"];
 
@@ -207,7 +208,7 @@ impl<Client: BazelClient> BazelContext<Client> {
                     .to_string_lossy()
                     .to_string()
                 {
-                    name if name == Self::DEFAULT_WORKSPACE_NAME => None,
+                    name if Self::is_default_workspace_name(&name) => None,
                     name => Some(name),
                 }
             }),
@@ -216,6 +217,12 @@ impl<Client: BazelClient> BazelContext<Client> {
                 .map(|output_base| PathBuf::from(output_base).join("external")),
             client,
         })
+    }
+
+    fn is_default_workspace_name(name: &str) -> bool {
+        Self::DEFAULT_WORKSPACE_NAMES
+            .iter()
+            .any(|workspace_name| *workspace_name == name)
     }
 
     // Convert an anyhow over iterator of EvalMessage, into an iterator of EvalMessage
@@ -353,6 +360,25 @@ impl<Client: BazelClient> BazelContext<Client> {
             })
     }
 
+    fn get_repository_for_lspurl<'a>(&'a self, url: &'a LspUrl) -> Option<Cow<'a, str>> {
+        match url {
+            LspUrl::File(path) => self.get_repository_for_path(path).map(|(repo, _)| repo),
+            _ => None,
+        }
+    }
+
+    // TODO: Consider caching this
+    fn repo_mapping_for_file(
+        &self,
+        current_file: &LspUrl,
+    ) -> anyhow::Result<HashMap<String, String>> {
+        let current_repository = self
+            .get_repository_for_lspurl(current_file)
+            .unwrap_or(Cow::Borrowed(""));
+
+        self.client.dump_repo_mapping(&current_repository)
+    }
+
     fn get_repository_path(&self, repository_name: &str) -> Option<PathBuf> {
         self.external_output_base
             .as_ref()
@@ -375,41 +401,25 @@ impl<Client: BazelClient> BazelContext<Client> {
         // Also with all of these cases, we need to consider if we have build system
         // information or not. If not, we can't resolve any remote repositories, and we can't
         // know whether a repository name refers to the workspace or not.
-        let resolve_root = match (&label.repo, current_file) {
-            // Repository is empty, and we know what file we're resolving from. Use the build
+        let resolve_root = match &label.repo {
+            // Repository is empty. If we know what file we're resolving from, use the build
             // system information to check if we're in a known remote repository, and what the
             // root is. Fall back to the `workspace_root` otherwise.
-            (None, LspUrl::File(current_file)) => {
-                if let Some((repository_name, _)) = self.get_repository_for_path(current_file) {
+            None => {
+                if let Some(repository_name) = self.get_repository_for_lspurl(current_file) {
                     self.get_repository_path(&repository_name).map(Cow::Owned)
                 } else {
                     workspace_root.map(Cow::Borrowed)
                 }
             }
-            // No repository in the load path, and we don't have build system information, or
-            // an `LspUrl` we can't use to check the root. Use the workspace root.
-            (None, _) => workspace_root.map(Cow::Borrowed),
             // We have a repository name and build system information. Check if the repository
             // name refers to the workspace, and if so, use the workspace root. If not, check
             // if it refers to a known remote repository, and if so, use that root.
             // Otherwise, fail with an error.
-            (Some(repository), current_file) => {
+            Some(repository) => {
                 // If we are navigating to another repository, we need to apply the repo mapping.
                 // The repo mapping depends on the current repository, so resolve that first.
-                let current_repository = if let LspUrl::File(current_file) = current_file {
-                    if let Some((repository_name, _)) = self.get_repository_for_path(current_file) {
-                        repository_name
-                    } else {
-                        Cow::Borrowed("")
-                    }
-                } else {
-                    Cow::Borrowed("")
-                };
-
-                let repo_mapping = self
-                    .client
-                    .dump_repo_mapping(&current_repository)
-                    .unwrap_or_else(|_| HashMap::new());
+                let repo_mapping = self.repo_mapping_for_file(current_file).unwrap_or_default();
 
                 let remote_repository_name = repo_mapping
                     .get(&repository.name)
@@ -781,8 +791,19 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
             || (current_value.starts_with('@') && !current_value.contains('/'))
             || (!current_value.contains('/') && !current_value.contains(':'));
 
+        let repo_mapping = self.repo_mapping_for_file(document_uri);
+
         let mut names = if offer_repository_names {
-            self.get_repository_names()
+            let repo_names = match &repo_mapping {
+                Ok(repo_mappings) => repo_mappings
+                    .keys()
+                    .filter(|key| *key != "")
+                    .map(|key| Cow::Borrowed(key.deref()))
+                    .collect(),
+                Err(_) => self.get_repository_names(),
+            };
+
+            repo_names
                 .into_iter()
                 .map(|name| {
                     let name_with_at = format!("@{}", name);
@@ -864,7 +885,10 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
 #[cfg(test)]
 mod tests {
     use serde_json::json;
-    use starlark_lsp::server::{LspContext, LspUrl};
+    use starlark_lsp::{
+        completion::StringCompletionType,
+        server::{LspContext, LspUrl},
+    };
 
     use crate::test_fixture::TestFixture;
 
@@ -952,6 +976,30 @@ mod tests {
                     .join("defs.bzl")
             )
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_completion_for_repositories_in_root_workspace_with_bzlmod() -> anyhow::Result<()> {
+        let repo_mappings = serde_json::from_value(json!({
+            "": {
+                "": "",
+                "rules_rust": "rules_rust~0.36.2",
+            },
+        }))?;
+
+        let fixture = TestFixture::new("bzlmod")?;
+        let context = fixture.context_with_repo_mappings(repo_mappings)?;
+
+        let completions = context.get_string_completion_options(
+            &LspUrl::File(fixture.workspace_root().join("BUILD")),
+            StringCompletionType::LoadPath,
+            "@rules_ru",
+            Some(&fixture.workspace_root()),
+        )?;
+
+        assert_eq!(completions[0].value, "@rules_rust");
 
         Ok(())
     }
