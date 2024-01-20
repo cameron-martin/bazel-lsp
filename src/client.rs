@@ -1,4 +1,4 @@
-use std::process::Command;
+use std::{process::Command, path::{PathBuf, Path}};
 
 #[derive(Clone)]
 pub(crate) struct BazelInfo {
@@ -13,11 +13,21 @@ pub(crate) trait BazelClient {
     fn info(&self) -> anyhow::Result<BazelInfo>;
 }
 
-pub(crate) struct BazelCli;
+pub(crate) struct BazelCli {
+    bazel: PathBuf,
+}
+
+impl BazelCli {
+    pub fn new<P: AsRef<Path>>(bazel: P) -> Self {
+        Self {
+            bazel: bazel.as_ref().to_owned(),
+        }
+    }
+}
 
 impl BazelClient for BazelCli {
     fn info(&self) -> anyhow::Result<BazelInfo> {
-        let mut raw_command = Command::new("bazel");
+        let mut raw_command = Command::new(&self.bazel);
         let mut command = raw_command.arg("info");
         command = command.current_dir(std::env::current_dir()?);
 
