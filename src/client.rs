@@ -1,4 +1,8 @@
-use std::{collections::HashMap, process::Command};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 use anyhow::anyhow;
 
@@ -16,11 +20,21 @@ pub(crate) trait BazelClient {
     fn dump_repo_mapping(&self, repo: &str) -> anyhow::Result<HashMap<String, String>>;
 }
 
-pub(crate) struct BazelCli;
+pub(crate) struct BazelCli {
+    bazel: PathBuf,
+}
+
+impl BazelCli {
+    pub fn new<P: AsRef<Path>>(bazel: P) -> Self {
+        Self {
+            bazel: bazel.as_ref().to_owned(),
+        }
+    }
+}
 
 impl BazelClient for BazelCli {
     fn info(&self) -> anyhow::Result<BazelInfo> {
-        let output = Command::new("bazel")
+        let output = Command::new(&self.bazel)
             .arg("info")
             .current_dir(std::env::current_dir()?)
             .output()?;
@@ -49,16 +63,14 @@ impl BazelClient for BazelCli {
     }
 
     fn dump_repo_mapping(&self, repo: &str) -> anyhow::Result<HashMap<String, String>> {
-        let output = Command::new("bazel")
+        let output = Command::new(&self.bazel)
             .args(["mod", "dump_repo_mapping"])
             .arg(repo)
             .current_dir(std::env::current_dir()?)
             .output()?;
 
         if !output.status.success() {
-            return Err(anyhow!(
-                "Command `bazel mod dump_repo_mapping` failed"
-            ));
+            return Err(anyhow!("Command `bazel mod dump_repo_mapping` failed"));
         }
 
         Ok(serde_json::from_slice(&output.stdout)?)
