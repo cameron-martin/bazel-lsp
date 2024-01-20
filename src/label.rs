@@ -117,8 +117,8 @@ impl Label {
 
 #[cfg(test)]
 mod tests {
-    use super::Label;
-    use crate::bazel::label::LabelRepo;
+    use crate::label::Label;
+    use crate::label::LabelRepo;
 
     #[test]
     fn test_parsing_repo_only_labels() {

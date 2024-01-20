@@ -23,8 +23,6 @@
 //! interface develops. After the API of the `LspContext` trait stabilizes, this
 //! module will be removed, and extracted to its own project.
 
-mod label;
-
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -58,12 +56,12 @@ use starlark_lsp::server::LspEvalResult;
 use starlark_lsp::server::LspUrl;
 use starlark_lsp::server::StringLiteralResult;
 
-use self::label::Label;
 use crate::client::BazelClient;
 use crate::eval::dialect;
 use crate::eval::globals;
 use crate::eval::ContextMode;
 use crate::eval::EvalResult;
+use crate::label::Label;
 
 #[derive(Debug, thiserror::Error)]
 enum ContextError {
