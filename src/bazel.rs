@@ -882,9 +882,10 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
 
 #[cfg(test)]
 mod tests {
+    use lsp_types::CompletionItemKind;
     use serde_json::json;
     use starlark_lsp::{
-        completion::StringCompletionType,
+        completion::{StringCompletionResult, StringCompletionType},
         server::{LspContext, LspUrl},
     };
 
@@ -992,12 +993,52 @@ mod tests {
 
         let completions = context.get_string_completion_options(
             &LspUrl::File(fixture.workspace_root().join("BUILD")),
-            StringCompletionType::LoadPath,
+            StringCompletionType::String,
             "@rules_ru",
             Some(&fixture.workspace_root()),
         )?;
 
-        assert_eq!(completions[0].value, "@rules_rust");
+        assert_eq!(
+            completions[0],
+            StringCompletionResult {
+                value: "@rules_rust".into(),
+                insert_text: Some("@rules_rust//".into()),
+                insert_text_offset: 0,
+                kind: CompletionItemKind::MODULE,
+            }
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_completion_for_packages_in_root_workspace_with_bzlmod() -> anyhow::Result<()> {
+        let repo_mappings = serde_json::from_value(json!({
+            "": {
+                "": "",
+                "rules_rust": "rules_rust~0.36.2",
+            },
+        }))?;
+
+        let fixture = TestFixture::new("bzlmod")?;
+        let context = fixture.context_with_repo_mappings(repo_mappings)?;
+
+        let completions = context.get_string_completion_options(
+            &LspUrl::File(fixture.workspace_root().join("BUILD")),
+            StringCompletionType::LoadPath,
+            "@rules_rust//",
+            Some(&fixture.workspace_root()),
+        )?;
+
+        assert_eq!(
+            completions[0],
+            StringCompletionResult {
+                value: "rust".into(),
+                insert_text: Some("rust".into()),
+                insert_text_offset: "@rules_rust//".len(),
+                kind: CompletionItemKind::FOLDER,
+            }
+        );
 
         Ok(())
     }
