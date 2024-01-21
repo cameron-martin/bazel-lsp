@@ -18,6 +18,7 @@ pub(crate) struct BazelInfo {
 pub(crate) trait BazelClient {
     fn info(&self) -> anyhow::Result<BazelInfo>;
     fn dump_repo_mapping(&self, repo: &str) -> anyhow::Result<HashMap<String, String>>;
+    fn query(&self, workspace_dir: Option<&Path>, query: &str) -> anyhow::Result<String>;
 }
 
 pub(crate) struct BazelCli {
@@ -75,12 +76,28 @@ impl BazelClient for BazelCli {
 
         Ok(serde_json::from_slice(&output.stdout)?)
     }
+
+    fn query(&self, workspace_dir: Option<&Path>, query: &str) -> anyhow::Result<String> {
+        let mut command = Command::new(&self.bazel);
+        let mut command = command.arg("query").arg(query);
+        if let Some(workspace_dir) = workspace_dir {
+            command = command.current_dir(workspace_dir)
+        }
+        let output = command.output()?;
+
+        if !output.status.success() {
+            return Err(anyhow::anyhow!("Command `bazel query` failed"));
+        }
+
+        Ok(String::from_utf8(output.stdout)?)
+    }
 }
 
 #[cfg(test)]
 pub(crate) struct MockBazel {
     pub(crate) info: BazelInfo,
     pub(crate) repo_mappings: HashMap<String, HashMap<String, String>>,
+    pub(crate) queries: HashMap<String, String>,
 }
 
 #[cfg(test)]
@@ -95,5 +112,12 @@ impl BazelClient for MockBazel {
             .get(repo)
             .ok_or_else(|| anyhow!("Cannot find repo mapping"))?
             .clone())
+    }
+
+    fn query(&self, _workspace_dir: Option<&Path>, query: &str) -> anyhow::Result<String> {
+        self.queries
+            .get(query)
+            .map(|result| result.clone())
+            .ok_or_else(|| anyhow!("Query {} not registered in mock", query))
     }
 }

@@ -36,24 +36,54 @@ impl TestFixture {
     }
 
     pub(crate) fn context(&self) -> anyhow::Result<BazelContext<MockBazel>> {
-        self.context_with_repo_mappings(HashMap::new())
+        self.context_builder()?.build()
     }
 
-    pub(crate) fn context_with_repo_mappings(
-        &self,
-        repo_mappings: HashMap<String, HashMap<String, String>>,
-    ) -> anyhow::Result<BazelContext<MockBazel>> {
-        let client = MockBazel {
-            info: BazelInfo {
-                output_base: Some(path_to_string(self.output_base())?),
-                execution_root: Some(path_to_string(
-                    self.output_base().join("execroot").join("_main"),
-                )?),
+    pub(crate) fn context_builder(&self) -> anyhow::Result<ContextBuilder> {
+        Ok(ContextBuilder {
+            client: MockBazel {
+                info: BazelInfo {
+                    output_base: Some(path_to_string(self.output_base())?),
+                    execution_root: Some(path_to_string(
+                        self.output_base().join("execroot").join("root"),
+                    )?),
+                },
+                queries: HashMap::new(),
+                repo_mappings: HashMap::new(),
             },
-            repo_mappings,
-        };
+            mode: ContextMode::Check,
+            print_non_none: true,
+            prelude: Vec::new(),
+            module: true,
+        })
+    }
 
-        BazelContext::new(client, ContextMode::Check, true, &[], true)
+
+}
+
+pub(crate) struct ContextBuilder {
+    client: MockBazel,
+    mode: ContextMode,
+    print_non_none: bool,
+    prelude: Vec<PathBuf>,
+    module: bool,
+}
+
+impl ContextBuilder {
+    pub(crate) fn query(mut self, query: &str, result: &str) -> Self {
+        self.client.queries.insert(query.into(), result.into());
+
+        self
+    }
+
+    pub(crate) fn repo_mapping_json(mut self, repo: &str, mapping: serde_json::Value) -> anyhow::Result<Self> {
+        self.client.repo_mappings.insert(repo.into(), serde_json::from_value(mapping)?);
+
+        Ok(self)
+    }
+
+    pub(crate) fn build(self) -> anyhow::Result<BazelContext<MockBazel>> {
+        BazelContext::new(self.client, self.mode, self.print_non_none, &self.prelude, self.module)
     }
 }
 

@@ -32,7 +32,6 @@ use std::iter;
 use std::ops::Deref;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
 
 use either::Either;
 use lsp_types::CompletionItemKind;
@@ -499,12 +498,12 @@ impl<Client: BazelClient> BazelContext<Client> {
     ) -> anyhow::Result<()> {
         // Find the actual folder on disk we're looking at.
         let (from_path, render_base) = match from {
-            FilesystemCompletionRoot::Path(path) => (path.to_owned(), path.to_string_lossy()),
+            FilesystemCompletionRoot::Path(path) => (path.to_owned(), ""),
             FilesystemCompletionRoot::String(str) => {
                 let label = Label::parse(str)?;
                 (
                     self.resolve_folder(&label, current_file, workspace_root)?,
-                    Cow::Borrowed(str),
+                    str,
                 )
             }
         };
@@ -598,18 +597,11 @@ impl<Client: BazelClient> BazelContext<Client> {
         module: &str,
         workspace_dir: Option<&Path>,
     ) -> Option<Vec<String>> {
-        let mut raw_command = Command::new("bazel");
-        let mut command = raw_command.arg("query").arg(format!("{module}*"));
-        if let Some(workspace_dir) = workspace_dir {
-            command = command.current_dir(workspace_dir);
-        }
+        let output = self
+            .client
+            .query(workspace_dir, &format!("{module}*"))
+            .ok()?;
 
-        let output = command.output().ok()?;
-        if !output.status.success() {
-            return None;
-        }
-
-        let output = String::from_utf8(output.stdout).ok()?;
         Some(
             output
                 .lines()
@@ -950,15 +942,17 @@ mod tests {
 
     #[test]
     fn external_resolve_load_in_bzlmod_workspace() -> anyhow::Result<()> {
-        let repo_mappings = serde_json::from_value(json!({
-            "": {
-                "": "",
-                "rules_rust": "rules_rust~0.36.2",
-            },
-        }))?;
-
         let fixture = TestFixture::new("bzlmod")?;
-        let context = fixture.context_with_repo_mappings(repo_mappings)?;
+        let context = fixture
+            .context_builder()?
+            .repo_mapping_json(
+                "",
+                json!({
+                    "": "",
+                    "rules_rust": "rules_rust~0.36.2",
+                }),
+            )?
+            .build()?;
 
         let url = context.resolve_load(
             "@rules_rust//rust:defs.bzl",
@@ -981,15 +975,17 @@ mod tests {
 
     #[test]
     fn test_completion_for_repositories_in_root_workspace_with_bzlmod() -> anyhow::Result<()> {
-        let repo_mappings = serde_json::from_value(json!({
-            "": {
-                "": "",
-                "rules_rust": "rules_rust~0.36.2",
-            },
-        }))?;
-
         let fixture = TestFixture::new("bzlmod")?;
-        let context = fixture.context_with_repo_mappings(repo_mappings)?;
+        let context = fixture
+            .context_builder()?
+            .repo_mapping_json(
+                "",
+                json!({
+                    "": "",
+                    "rules_rust": "rules_rust~0.36.2",
+                }),
+            )?
+            .build()?;
 
         let completions = context.get_string_completion_options(
             &LspUrl::File(fixture.workspace_root().join("BUILD")),
@@ -1013,15 +1009,17 @@ mod tests {
 
     #[test]
     fn test_completion_for_packages_in_root_workspace_with_bzlmod() -> anyhow::Result<()> {
-        let repo_mappings = serde_json::from_value(json!({
-            "": {
-                "": "",
-                "rules_rust": "rules_rust~0.36.2",
-            },
-        }))?;
-
         let fixture = TestFixture::new("bzlmod")?;
-        let context = fixture.context_with_repo_mappings(repo_mappings)?;
+        let context = fixture
+            .context_builder()?
+            .repo_mapping_json(
+                "",
+                json!({
+                    "": "",
+                    "rules_rust": "rules_rust~0.36.2",
+                }),
+            )?
+            .build()?;
 
         let completions = context.get_string_completion_options(
             &LspUrl::File(fixture.workspace_root().join("BUILD")),
@@ -1037,6 +1035,99 @@ mod tests {
                 insert_text: Some("rust".into()),
                 insert_text_offset: "@rules_rust//".len(),
                 kind: CompletionItemKind::FOLDER,
+            }
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_completion_for_bare_targets() -> anyhow::Result<()> {
+        let fixture = TestFixture::new("simple")?;
+        let context = fixture.context()?;
+
+        let completions = context.get_string_completion_options(
+            &LspUrl::File(fixture.workspace_root().join("BUILD")),
+            StringCompletionType::String,
+            "",
+            Some(&fixture.workspace_root()),
+        )?;
+
+        let completion = completions
+            .iter()
+            .find(|completion| completion.value == "main.cc")
+            .unwrap();
+
+        assert_eq!(
+            *completion,
+            StringCompletionResult {
+                value: "main.cc".into(),
+                insert_text: Some("main.cc".into()),
+                insert_text_offset: 0,
+                kind: CompletionItemKind::FILE,
+            }
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_completion_for_files_in_package() -> anyhow::Result<()> {
+        let fixture = TestFixture::new("simple")?;
+        let context = fixture.context()?;
+
+        let completions = context.get_string_completion_options(
+            &LspUrl::File(fixture.workspace_root().join("BUILD")),
+            StringCompletionType::String,
+            "//foo:",
+            Some(&fixture.workspace_root()),
+        )?;
+
+        let completion = completions
+            .iter()
+            .find(|completion| completion.value == "main.cc")
+            .unwrap();
+
+        assert_eq!(
+            *completion,
+            StringCompletionResult {
+                value: "main.cc".into(),
+                insert_text: Some("main.cc".into()),
+                insert_text_offset: "//foo:".len(),
+                kind: CompletionItemKind::FILE,
+            }
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_completion_for_targets_in_package() -> anyhow::Result<()> {
+        let fixture = TestFixture::new("simple")?;
+        let context = fixture
+            .context_builder()?
+            .query("//foo:*", "//foo:main\n")
+            .build()?;
+
+        let completions = context.get_string_completion_options(
+            &LspUrl::File(fixture.workspace_root().join("BUILD")),
+            StringCompletionType::String,
+            "//foo:",
+            Some(&fixture.workspace_root()),
+        )?;
+
+        let completion = completions
+            .iter()
+            .find(|completion| completion.value == "main")
+            .unwrap();
+
+        assert_eq!(
+            *completion,
+            StringCompletionResult {
+                value: "main".into(),
+                insert_text: Some("main".into()),
+                insert_text_offset: "//foo:".len(),
+                kind: CompletionItemKind::PROPERTY,
             }
         );
 
