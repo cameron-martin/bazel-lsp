@@ -15,13 +15,8 @@
  * limitations under the License.
  */
 
-//! This file provides an implementation of `LspContext` specifically aimed at
-//! the use in a Bazel project. You can invoke it by using `starlark --lsp --bazel`.
-//! Note that only `--lsp` mode is supported.
-//!
-//! This module is temporary, for the purpose of rapid iteration while the LSP
-//! interface develops. After the API of the `LspContext` trait stabilizes, this
-//! module will be removed, and extracted to its own project.
+//! This file provides an implementation of starlark-rust's `LspContext` aimed at
+//! the use in a Bazel project.
 
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -1130,6 +1125,8 @@ mod tests {
                 kind: CompletionItemKind::PROPERTY,
             }
         );
+
+        assert_eq!(context.client.profile.borrow().query, 1);
 
         Ok(())
     }

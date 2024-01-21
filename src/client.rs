@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
-    process::Command,
+    process::Command, cell::RefCell,
 };
 
 use anyhow::anyhow;
@@ -90,6 +90,49 @@ impl BazelClient for BazelCli {
         }
 
         Ok(String::from_utf8(output.stdout)?)
+    }
+}
+
+#[derive(Default)]
+pub struct Profile {
+    pub info: u16,
+    pub dump_repo_mapping: u16,
+    pub query: u16,
+}
+
+/// A wrapper client that records the number of invocations to the inner client.
+/// Used for testing that bazel isn't being called too many times, for example in a loop.
+pub struct ProfilingClient<InnerClient> {
+    inner: InnerClient,
+    pub profile: RefCell<Profile>,
+}
+
+impl<InnerClient> ProfilingClient<InnerClient> {
+    pub fn new(inner: InnerClient) -> Self {
+        Self {
+            inner,
+            profile: Default::default(),
+        }
+    }
+}
+
+impl<InnerClient: BazelClient> BazelClient for ProfilingClient<InnerClient> {
+    fn info(&self) -> anyhow::Result<BazelInfo> {
+        self.profile.borrow_mut().info += 1;
+
+        self.inner.info()
+    }
+
+    fn dump_repo_mapping(&self, repo: &str) -> anyhow::Result<HashMap<String, String>> {
+        self.profile.borrow_mut().dump_repo_mapping += 1;
+
+        self.inner.dump_repo_mapping(repo)
+    }
+
+    fn query(&self, workspace_dir: Option<&Path>, query: &str) -> anyhow::Result<String> {
+        self.profile.borrow_mut().query += 1;
+
+        self.inner.query(workspace_dir, query)
     }
 }
 

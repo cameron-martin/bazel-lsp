@@ -8,7 +8,7 @@ use anyhow::anyhow;
 
 use crate::{
     bazel::BazelContext,
-    client::{BazelInfo, MockBazel},
+    client::{BazelInfo, MockBazel, ProfilingClient},
     eval::ContextMode,
 };
 
@@ -35,7 +35,7 @@ impl TestFixture {
         self.output_base().join("external").join(repo)
     }
 
-    pub(crate) fn context(&self) -> anyhow::Result<BazelContext<MockBazel>> {
+    pub(crate) fn context(&self) -> anyhow::Result<BazelContext<ProfilingClient<MockBazel>>> {
         self.context_builder()?.build()
     }
 
@@ -57,8 +57,6 @@ impl TestFixture {
             module: true,
         })
     }
-
-
 }
 
 pub(crate) struct ContextBuilder {
@@ -82,8 +80,14 @@ impl ContextBuilder {
         Ok(self)
     }
 
-    pub(crate) fn build(self) -> anyhow::Result<BazelContext<MockBazel>> {
-        BazelContext::new(self.client, self.mode, self.print_non_none, &self.prelude, self.module)
+    pub(crate) fn build(self) -> anyhow::Result<BazelContext<ProfilingClient<MockBazel>>> {
+        BazelContext::new(
+            ProfilingClient::new(self.client),
+            self.mode,
+            self.print_non_none,
+            &self.prelude,
+            self.module,
+        )
     }
 }
 
