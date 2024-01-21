@@ -981,6 +981,8 @@ mod tests {
             }
         );
 
+        assert_eq!(context.client.profile.borrow().query, 1);
+
         Ok(())
     }
 }

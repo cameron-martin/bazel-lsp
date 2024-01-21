@@ -1,6 +1,6 @@
 use std::{
     path::{Path, PathBuf},
-    process::Command,
+    process::Command, cell::RefCell,
 };
 
 #[cfg(test)]
@@ -78,6 +78,42 @@ impl BazelClient for BazelCli {
         }
 
         Ok(String::from_utf8(output.stdout)?)
+    }
+}
+
+#[derive(Default)]
+pub struct Profile {
+    pub info: u16,
+    pub query: u16,
+}
+
+/// A wrapper client that records the number of invocations to the inner client.
+/// Used for testing that bazel isn't being called too many times, for example in a loop.
+pub struct ProfilingClient<InnerClient> {
+    inner: InnerClient,
+    pub profile: RefCell<Profile>,
+}
+
+impl<InnerClient> ProfilingClient<InnerClient> {
+    pub fn new(inner: InnerClient) -> Self {
+        Self {
+            inner,
+            profile: Default::default(),
+        }
+    }
+}
+
+impl<InnerClient: BazelClient> BazelClient for ProfilingClient<InnerClient> {
+    fn info(&self) -> anyhow::Result<BazelInfo> {
+        self.profile.borrow_mut().info += 1;
+
+        self.inner.info()
+    }
+
+    fn query(&self, workspace_dir: Option<&Path>, query: &str) -> anyhow::Result<String> {
+        self.profile.borrow_mut().query += 1;
+
+        self.inner.query(workspace_dir, query)
     }
 }
 
