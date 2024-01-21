@@ -31,7 +31,6 @@ use std::io;
 use std::iter;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
 
 use either::Either;
 use lsp_types::CompletionItemKind;
@@ -133,7 +132,7 @@ struct FilesystemCompletionOptions {
     targets: bool,
 }
 
-pub(crate) struct BazelContext {
+pub(crate) struct BazelContext<Client> {
     pub(crate) workspace_name: Option<String>,
     pub(crate) external_output_base: Option<PathBuf>,
     pub(crate) mode: ContextMode,
@@ -142,14 +141,15 @@ pub(crate) struct BazelContext {
     pub(crate) module: Option<Module>,
     pub(crate) builtin_docs: HashMap<LspUrl, String>,
     pub(crate) builtin_symbols: HashMap<String, LspUrl>,
+    pub(crate) client: Client,
 }
 
-impl BazelContext {
+impl<Client: BazelClient> BazelContext<Client> {
     const DEFAULT_WORKSPACE_NAME: &'static str = "__main__";
     const BUILD_FILE_NAMES: [&'static str; 2] = ["BUILD", "BUILD.bazel"];
     const LOADABLE_EXTENSIONS: [&'static str; 1] = ["bzl"];
 
-    pub(crate) fn new<Client: BazelClient>(
+    pub(crate) fn new(
         client: Client,
         mode: ContextMode,
         print_non_none: bool,
@@ -211,6 +211,7 @@ impl BazelContext {
             external_output_base: info
                 .output_base
                 .map(|output_base| PathBuf::from(output_base).join("external")),
+            client,
         })
     }
 
@@ -465,12 +466,12 @@ impl BazelContext {
     ) -> anyhow::Result<()> {
         // Find the actual folder on disk we're looking at.
         let (from_path, render_base) = match from {
-            FilesystemCompletionRoot::Path(path) => (path.to_owned(), path.to_string_lossy()),
+            FilesystemCompletionRoot::Path(path) => (path.to_owned(), ""),
             FilesystemCompletionRoot::String(str) => {
                 let label = Label::parse(str)?;
                 (
                     self.resolve_folder(&label, current_file, workspace_root)?,
-                    Cow::Borrowed(str),
+                    str,
                 )
             }
         };
@@ -564,18 +565,11 @@ impl BazelContext {
         module: &str,
         workspace_dir: Option<&Path>,
     ) -> Option<Vec<String>> {
-        let mut raw_command = Command::new("bazel");
-        let mut command = raw_command.arg("query").arg(format!("{module}*"));
-        if let Some(workspace_dir) = workspace_dir {
-            command = command.current_dir(workspace_dir);
-        }
+        let output = self
+            .client
+            .query(workspace_dir, &format!("{module}*"))
+            .ok()?;
 
-        let output = command.output().ok()?;
-        if !output.status.success() {
-            return None;
-        }
-
-        let output = String::from_utf8(output.stdout).ok()?;
         Some(
             output
                 .lines()
@@ -585,7 +579,7 @@ impl BazelContext {
     }
 }
 
-impl LspContext for BazelContext {
+impl<Client: BazelClient> LspContext for BazelContext<Client> {
     fn parse_file_with_contents(&self, uri: &LspUrl, content: String) -> LspEvalResult {
         match uri {
             LspUrl::File(uri) => {
@@ -837,7 +831,11 @@ impl LspContext for BazelContext {
 
 #[cfg(test)]
 mod tests {
-    use starlark_lsp::server::{LspContext, LspUrl};
+    use lsp_types::CompletionItemKind;
+    use starlark_lsp::{
+        completion::{StringCompletionResult, StringCompletionType},
+        server::{LspContext, LspUrl},
+    };
 
     use crate::test_fixture::TestFixture;
 
@@ -893,6 +891,99 @@ mod tests {
         assert_eq!(
             url,
             LspUrl::File(fixture.external_dir("foo").join("foo.bzl"))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_completion_for_bare_targets() -> anyhow::Result<()> {
+        let fixture = TestFixture::new("simple")?;
+        let context = fixture.context()?;
+
+        let completions = context.get_string_completion_options(
+            &LspUrl::File(fixture.workspace_root().join("BUILD")),
+            StringCompletionType::String,
+            "",
+            Some(&fixture.workspace_root()),
+        )?;
+
+        let completion = completions
+            .iter()
+            .find(|completion| completion.value == "main.cc")
+            .unwrap();
+
+        assert_eq!(
+            *completion,
+            StringCompletionResult {
+                value: "main.cc".into(),
+                insert_text: Some("main.cc".into()),
+                insert_text_offset: 0,
+                kind: CompletionItemKind::FILE,
+            }
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_completion_for_files_in_package() -> anyhow::Result<()> {
+        let fixture = TestFixture::new("simple")?;
+        let context = fixture.context()?;
+
+        let completions = context.get_string_completion_options(
+            &LspUrl::File(fixture.workspace_root().join("BUILD")),
+            StringCompletionType::String,
+            "//foo:",
+            Some(&fixture.workspace_root()),
+        )?;
+
+        let completion = completions
+            .iter()
+            .find(|completion| completion.value == "main.cc")
+            .unwrap();
+
+        assert_eq!(
+            *completion,
+            StringCompletionResult {
+                value: "main.cc".into(),
+                insert_text: Some("main.cc".into()),
+                insert_text_offset: "//foo:".len(),
+                kind: CompletionItemKind::FILE,
+            }
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_completion_for_targets_in_package() -> anyhow::Result<()> {
+        let fixture = TestFixture::new("simple")?;
+        let context = fixture
+            .context_builder()?
+            .query("//foo:*", "//foo:main\n")
+            .build()?;
+
+        let completions = context.get_string_completion_options(
+            &LspUrl::File(fixture.workspace_root().join("BUILD")),
+            StringCompletionType::String,
+            "//foo:",
+            Some(&fixture.workspace_root()),
+        )?;
+
+        let completion = completions
+            .iter()
+            .find(|completion| completion.value == "main")
+            .unwrap();
+
+        assert_eq!(
+            *completion,
+            StringCompletionResult {
+                value: "main".into(),
+                insert_text: Some("main".into()),
+                insert_text_offset: "//foo:".len(),
+                kind: CompletionItemKind::PROPERTY,
+            }
         );
 
         Ok(())
