@@ -965,6 +965,8 @@ mod tests {
             )
         );
 
+        assert_eq!(context.client.profile.borrow().dump_repo_mapping, 1);
+
         Ok(())
     }
 
@@ -999,6 +1001,8 @@ mod tests {
             }
         );
 
+        assert_eq!(context.client.profile.borrow().dump_repo_mapping, 1);
+
         Ok(())
     }
 
@@ -1032,6 +1036,9 @@ mod tests {
                 kind: CompletionItemKind::FOLDER,
             }
         );
+
+        assert_eq!(context.client.profile.borrow().query, 0);
+        assert_eq!(context.client.profile.borrow().dump_repo_mapping, 1);
 
         Ok(())
     }
