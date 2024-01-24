@@ -2,6 +2,7 @@ mod bazel;
 mod client;
 mod eval;
 mod label;
+mod workspace;
 #[cfg(test)]
 pub mod test_fixture;
 

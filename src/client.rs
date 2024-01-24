@@ -19,8 +19,8 @@ pub(crate) struct BazelInfo {
 /// where we don't want to actually invoke Bazel since this is costly. For example
 /// it involves spawning a server and each invocation takes a workspace-level lock.
 pub(crate) trait BazelClient {
-    fn info(&self) -> anyhow::Result<BazelInfo>;
-    fn query(&self, workspace_dir: Option<&Path>, query: &str) -> anyhow::Result<String>;
+    fn info(&self, workspace_root: &Path) -> anyhow::Result<BazelInfo>;
+    fn query(&self, workspace_root: &Path, query: &str) -> anyhow::Result<String>;
 }
 
 pub(crate) struct BazelCli {
@@ -36,10 +36,10 @@ impl BazelCli {
 }
 
 impl BazelClient for BazelCli {
-    fn info(&self) -> anyhow::Result<BazelInfo> {
+    fn info(&self, workspace_root: &Path) -> anyhow::Result<BazelInfo> {
         let mut raw_command = Command::new(&self.bazel);
         let mut command = raw_command.arg("info");
-        command = command.current_dir(std::env::current_dir()?);
+        command = command.current_dir(workspace_root);
 
         let output = command.output()?;
         if !output.status.success() {
@@ -65,12 +65,10 @@ impl BazelClient for BazelCli {
         })
     }
 
-    fn query(&self, workspace_dir: Option<&Path>, query: &str) -> anyhow::Result<String> {
+    fn query(&self, workspace_root: &Path, query: &str) -> anyhow::Result<String> {
         let mut command = Command::new(&self.bazel);
         let mut command = command.arg("query").arg(query);
-        if let Some(workspace_dir) = workspace_dir {
-            command = command.current_dir(workspace_dir)
-        }
+        command = command.current_dir(workspace_root);
         let output = command.output()?;
 
         if !output.status.success() {
@@ -104,16 +102,16 @@ impl<InnerClient> ProfilingClient<InnerClient> {
 }
 
 impl<InnerClient: BazelClient> BazelClient for ProfilingClient<InnerClient> {
-    fn info(&self) -> anyhow::Result<BazelInfo> {
+    fn info(&self, workspace_root: &Path) -> anyhow::Result<BazelInfo> {
         self.profile.borrow_mut().info += 1;
 
-        self.inner.info()
+        self.inner.info(workspace_root)
     }
 
-    fn query(&self, workspace_dir: Option<&Path>, query: &str) -> anyhow::Result<String> {
+    fn query(&self, workspace_root: &Path, query: &str) -> anyhow::Result<String> {
         self.profile.borrow_mut().query += 1;
 
-        self.inner.query(workspace_dir, query)
+        self.inner.query(workspace_root, query)
     }
 }
 
@@ -125,11 +123,11 @@ pub(crate) struct MockBazel {
 
 #[cfg(test)]
 impl BazelClient for MockBazel {
-    fn info(&self) -> anyhow::Result<BazelInfo> {
+    fn info(&self, _workspace_root: &Path) -> anyhow::Result<BazelInfo> {
         Ok(self.info.clone())
     }
 
-    fn query(&self, _workspace_dir: Option<&Path>, query: &str) -> anyhow::Result<String> {
+    fn query(&self, _workspace_root: &Path, query: &str) -> anyhow::Result<String> {
         self.queries
             .get(query)
             .map(|result| result.clone())
