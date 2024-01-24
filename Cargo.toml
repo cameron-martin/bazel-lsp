@@ -13,4 +13,5 @@ itertools = "0.12.0"
 lsp-types = "0.94.1"
 starlark = { git = "https://github.com/facebookexperimental/starlark-rust.git" }
 starlark_lsp = { git = "https://github.com/facebookexperimental/starlark-rust.git" }
+tempfile = "3.9.0"
 thiserror = "1.0.56"

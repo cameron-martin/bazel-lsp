@@ -1,6 +1,7 @@
 use std::{
+    cell::RefCell,
     path::{Path, PathBuf},
-    process::Command, cell::RefCell,
+    process::Command,
 };
 
 #[cfg(test)]
@@ -8,6 +9,8 @@ use std::collections::HashMap;
 
 #[cfg(test)]
 use anyhow::anyhow;
+
+use crate::workspace::BazelWorkspace;
 
 #[derive(Clone)]
 pub(crate) struct BazelInfo {
@@ -20,7 +23,7 @@ pub(crate) struct BazelInfo {
 /// it involves spawning a server and each invocation takes a workspace-level lock.
 pub(crate) trait BazelClient {
     fn info(&self, workspace_root: &Path) -> anyhow::Result<BazelInfo>;
-    fn query(&self, workspace_root: &Path, query: &str) -> anyhow::Result<String>;
+    fn query(&self, workspace: &BazelWorkspace, query: &str) -> anyhow::Result<String>;
 }
 
 pub(crate) struct BazelCli {
@@ -65,10 +68,14 @@ impl BazelClient for BazelCli {
         })
     }
 
-    fn query(&self, workspace_root: &Path, query: &str) -> anyhow::Result<String> {
-        let mut command = Command::new(&self.bazel);
-        let mut command = command.arg("query").arg(query);
-        command = command.current_dir(workspace_root);
+    fn query(&self, workspace: &BazelWorkspace, query: &str) -> anyhow::Result<String> {
+        let mut command = &mut Command::new(&self.bazel);
+        if let Some(output_base) = &workspace.query_output_base {
+            eprintln!("Running bazel query in {}", output_base.path().display());
+            command = command.arg("--output_base").arg(output_base.path());
+        }
+        command = command.arg("query").arg(query);
+        command = command.current_dir(&workspace.root);
         let output = command.output()?;
 
         if !output.status.success() {
@@ -108,10 +115,10 @@ impl<InnerClient: BazelClient> BazelClient for ProfilingClient<InnerClient> {
         self.inner.info(workspace_root)
     }
 
-    fn query(&self, workspace_root: &Path, query: &str) -> anyhow::Result<String> {
+    fn query(&self, workspace: &BazelWorkspace, query: &str) -> anyhow::Result<String> {
         self.profile.borrow_mut().query += 1;
 
-        self.inner.query(workspace_root, query)
+        self.inner.query(workspace, query)
     }
 }
 
@@ -127,7 +134,7 @@ impl BazelClient for MockBazel {
         Ok(self.info.clone())
     }
 
-    fn query(&self, _workspace_root: &Path, query: &str) -> anyhow::Result<String> {
+    fn query(&self, _workspace: &BazelWorkspace, query: &str) -> anyhow::Result<String> {
         self.queries
             .get(query)
             .map(|result| result.clone())

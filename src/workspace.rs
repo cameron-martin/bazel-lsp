@@ -1,9 +1,18 @@
-use std::{borrow::Cow, path::{Path, PathBuf}};
+use std::{
+    borrow::Cow,
+    io,
+    path::{Path, PathBuf},
+};
+
+use tempfile::TempDir;
 
 use crate::client::BazelInfo;
 
 pub struct BazelWorkspace {
     pub root: PathBuf,
+    /// The output base to use for querying. This allows queries to not
+    /// be blocked by concurrent builds.
+    pub query_output_base: Option<TempDir>,
     pub workspace_name: Option<String>,
     pub external_output_base: Option<PathBuf>,
 }
@@ -11,8 +20,12 @@ pub struct BazelWorkspace {
 const DEFAULT_WORKSPACE_NAME: &'static str = "__main__";
 
 impl BazelWorkspace {
-    pub fn from_bazel_info<P: AsRef<Path>>(root: P, info: BazelInfo) -> Self {
-        Self {
+    pub fn from_bazel_info<P1: AsRef<Path>, P2: AsRef<Path>>(
+        root: P1,
+        info: BazelInfo,
+        query_output_base: Option<P2>,
+    ) -> io::Result<Self> {
+        Ok(Self {
             root: root.as_ref().to_owned(),
             workspace_name: info.execution_root.and_then(|execroot| {
                 match PathBuf::from(execroot)
@@ -27,10 +40,18 @@ impl BazelWorkspace {
             external_output_base: info
                 .output_base
                 .map(|output_base| PathBuf::from(output_base).join("external")),
-        }
+            query_output_base: if let Some(output_base) = query_output_base {
+                Some(TempDir::with_prefix_in("bazel-lsp-", output_base)?)
+            } else {
+                None
+            },
+        })
     }
 
-    pub fn get_repository_for_path<'a>(&'a self, path: &'a Path) -> Option<(Cow<'a, str>, &'a Path)> {
+    pub fn get_repository_for_path<'a>(
+        &'a self,
+        path: &'a Path,
+    ) -> Option<(Cow<'a, str>, &'a Path)> {
         self.external_output_base
             .as_ref()
             .and_then(|external_output_base| path.strip_prefix(external_output_base).ok())

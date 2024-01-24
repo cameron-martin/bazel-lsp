@@ -132,6 +132,7 @@ struct FilesystemCompletionOptions {
 
 pub(crate) struct BazelContext<Client> {
     workspaces: RefCell<HashMap<PathBuf, Rc<BazelWorkspace>>>,
+    query_output_base: Option<PathBuf>,
     pub(crate) mode: ContextMode,
     pub(crate) print_non_none: bool,
     pub(crate) prelude: Vec<FrozenModule>,
@@ -151,6 +152,7 @@ impl<Client: BazelClient> BazelContext<Client> {
         print_non_none: bool,
         prelude: &[PathBuf],
         module: bool,
+        query_output_base: Option<PathBuf>,
     ) -> anyhow::Result<Self> {
         let globals = globals();
         let prelude: Vec<_> = prelude
@@ -187,6 +189,7 @@ impl<Client: BazelClient> BazelContext<Client> {
 
         Ok(Self {
             workspaces: RefCell::new(HashMap::new()),
+            query_output_base,
             mode,
             print_non_none,
             prelude,
@@ -320,7 +323,11 @@ impl<Client: BazelClient> BazelContext<Client> {
             } else {
                 let info = self.client.info(workspace_dir.as_ref())?;
 
-                let workspace = BazelWorkspace::from_bazel_info(&workspace_dir, info);
+                let workspace = BazelWorkspace::from_bazel_info(
+                    &workspace_dir,
+                    info,
+                    self.query_output_base.as_deref(),
+                )?;
 
                 workspaces.insert(workspace_dir.as_ref().to_owned(), Rc::new(workspace));
 
@@ -536,7 +543,7 @@ impl<Client: BazelClient> BazelContext<Client> {
 
         let output = self
             .client
-            .query(workspace.root.as_path(), &format!("{module}*"))
+            .query(workspace, &format!("{module}*"))
             .ok()?;
 
         Some(
