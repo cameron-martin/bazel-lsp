@@ -1,10 +1,13 @@
 use std::{
+    cell::RefCell,
     collections::HashMap,
     path::{Path, PathBuf},
-    process::Command, cell::RefCell,
+    process::Command,
 };
 
 use anyhow::anyhow;
+
+use crate::workspace::BazelWorkspace;
 
 #[derive(Clone)]
 pub(crate) struct BazelInfo {
@@ -16,9 +19,13 @@ pub(crate) struct BazelInfo {
 /// where we don't want to actually invoke Bazel since this is costly. For example
 /// it involves spawning a server and each invocation takes a workspace-level lock.
 pub(crate) trait BazelClient {
-    fn info(&self) -> anyhow::Result<BazelInfo>;
-    fn dump_repo_mapping(&self, repo: &str) -> anyhow::Result<HashMap<String, String>>;
-    fn query(&self, workspace_dir: Option<&Path>, query: &str) -> anyhow::Result<String>;
+    fn info(&self, workspace_root: &Path) -> anyhow::Result<BazelInfo>;
+    fn dump_repo_mapping(
+        &self,
+        workspace: &BazelWorkspace,
+        repo: &str,
+    ) -> anyhow::Result<HashMap<String, String>>;
+    fn query(&self, workspace: &BazelWorkspace, query: &str) -> anyhow::Result<String>;
 }
 
 pub(crate) struct BazelCli {
@@ -34,10 +41,10 @@ impl BazelCli {
 }
 
 impl BazelClient for BazelCli {
-    fn info(&self) -> anyhow::Result<BazelInfo> {
+    fn info(&self, workspace_root: &Path) -> anyhow::Result<BazelInfo> {
         let output = Command::new(&self.bazel)
             .arg("info")
-            .current_dir(std::env::current_dir()?)
+            .current_dir(workspace_root)
             .output()?;
 
         if !output.status.success() {
@@ -63,12 +70,21 @@ impl BazelClient for BazelCli {
         })
     }
 
-    fn dump_repo_mapping(&self, repo: &str) -> anyhow::Result<HashMap<String, String>> {
-        let output = Command::new(&self.bazel)
+    fn dump_repo_mapping(
+        &self,
+        workspace: &BazelWorkspace,
+        repo: &str,
+    ) -> anyhow::Result<HashMap<String, String>> {
+        let mut command = &mut Command::new(&self.bazel);
+        if let Some(output_base) = &workspace.query_output_base {
+            command = command.arg("--output_base").arg(output_base.path());
+        }
+        command = command
             .args(["mod", "dump_repo_mapping"])
             .arg(repo)
-            .current_dir(std::env::current_dir()?)
-            .output()?;
+            .current_dir(&workspace.root);
+
+        let output = command.output()?;
 
         if !output.status.success() {
             return Err(anyhow!("Command `bazel mod dump_repo_mapping` failed"));
@@ -77,12 +93,13 @@ impl BazelClient for BazelCli {
         Ok(serde_json::from_slice(&output.stdout)?)
     }
 
-    fn query(&self, workspace_dir: Option<&Path>, query: &str) -> anyhow::Result<String> {
-        let mut command = Command::new(&self.bazel);
-        let mut command = command.arg("query").arg(query);
-        if let Some(workspace_dir) = workspace_dir {
-            command = command.current_dir(workspace_dir)
+    fn query(&self, workspace: &BazelWorkspace, query: &str) -> anyhow::Result<String> {
+        let mut command = &mut Command::new(&self.bazel);
+        if let Some(output_base) = &workspace.query_output_base {
+            command = command.arg("--output_base").arg(output_base.path());
         }
+        command = command.arg("query").arg(query);
+        command = command.current_dir(&workspace.root);
         let output = command.output()?;
 
         if !output.status.success() {
@@ -117,22 +134,26 @@ impl<InnerClient> ProfilingClient<InnerClient> {
 }
 
 impl<InnerClient: BazelClient> BazelClient for ProfilingClient<InnerClient> {
-    fn info(&self) -> anyhow::Result<BazelInfo> {
+    fn info(&self, workspace_root: &Path) -> anyhow::Result<BazelInfo> {
         self.profile.borrow_mut().info += 1;
 
-        self.inner.info()
+        self.inner.info(workspace_root)
     }
 
-    fn dump_repo_mapping(&self, repo: &str) -> anyhow::Result<HashMap<String, String>> {
+    fn dump_repo_mapping(
+        &self,
+        workspace: &BazelWorkspace,
+        repo: &str,
+    ) -> anyhow::Result<HashMap<String, String>> {
         self.profile.borrow_mut().dump_repo_mapping += 1;
 
-        self.inner.dump_repo_mapping(repo)
+        self.inner.dump_repo_mapping(workspace, repo)
     }
 
-    fn query(&self, workspace_dir: Option<&Path>, query: &str) -> anyhow::Result<String> {
+    fn query(&self, workspace: &BazelWorkspace, query: &str) -> anyhow::Result<String> {
         self.profile.borrow_mut().query += 1;
 
-        self.inner.query(workspace_dir, query)
+        self.inner.query(workspace, query)
     }
 }
 
@@ -145,11 +166,15 @@ pub(crate) struct MockBazel {
 
 #[cfg(test)]
 impl BazelClient for MockBazel {
-    fn info(&self) -> anyhow::Result<BazelInfo> {
+    fn info(&self, _workspace_root: &Path) -> anyhow::Result<BazelInfo> {
         Ok(self.info.clone())
     }
 
-    fn dump_repo_mapping(&self, repo: &str) -> anyhow::Result<HashMap<String, String>> {
+    fn dump_repo_mapping(
+        &self,
+        _workspace: &BazelWorkspace,
+        repo: &str,
+    ) -> anyhow::Result<HashMap<String, String>> {
         Ok(self
             .repo_mappings
             .get(repo)
@@ -157,7 +182,7 @@ impl BazelClient for MockBazel {
             .clone())
     }
 
-    fn query(&self, _workspace_dir: Option<&Path>, query: &str) -> anyhow::Result<String> {
+    fn query(&self, _workspace: &BazelWorkspace, query: &str) -> anyhow::Result<String> {
         self.queries
             .get(query)
             .map(|result| result.clone())

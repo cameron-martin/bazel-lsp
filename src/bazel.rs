@@ -19,6 +19,7 @@
 //! the use in a Bazel project.
 
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs;
@@ -27,6 +28,7 @@ use std::iter;
 use std::ops::Deref;
 use std::path::Path;
 use std::path::PathBuf;
+use std::rc::Rc;
 
 use either::Either;
 use lsp_types::CompletionItemKind;
@@ -57,6 +59,7 @@ use crate::eval::globals;
 use crate::eval::ContextMode;
 use crate::eval::EvalResult;
 use crate::label::Label;
+use crate::workspace::BazelWorkspace;
 
 #[derive(Debug, thiserror::Error)]
 enum ContextError {
@@ -129,8 +132,8 @@ struct FilesystemCompletionOptions {
 }
 
 pub(crate) struct BazelContext<Client> {
-    pub(crate) workspace_name: Option<String>,
-    pub(crate) external_output_base: Option<PathBuf>,
+    workspaces: RefCell<HashMap<PathBuf, Rc<BazelWorkspace>>>,
+    query_output_base: Option<PathBuf>,
     pub(crate) mode: ContextMode,
     pub(crate) print_non_none: bool,
     pub(crate) prelude: Vec<FrozenModule>,
@@ -141,7 +144,6 @@ pub(crate) struct BazelContext<Client> {
 }
 
 impl<Client: BazelClient> BazelContext<Client> {
-    const DEFAULT_WORKSPACE_NAMES: [&'static str; 2] = ["__main__", "_main"];
     const BUILD_FILE_NAMES: [&'static str; 2] = ["BUILD", "BUILD.bazel"];
     const LOADABLE_EXTENSIONS: [&'static str; 1] = ["bzl"];
 
@@ -151,6 +153,7 @@ impl<Client: BazelClient> BazelContext<Client> {
         print_non_none: bool,
         prelude: &[PathBuf],
         module: bool,
+        query_output_base: Option<PathBuf>,
     ) -> anyhow::Result<Self> {
         let globals = globals();
         let prelude: Vec<_> = prelude
@@ -185,36 +188,17 @@ impl<Client: BazelClient> BazelContext<Client> {
             .map(|(u, ds)| (u, render_docs_as_code(&ds)))
             .collect();
 
-        let info = client.info()?;
-
         Ok(Self {
+            workspaces: RefCell::new(HashMap::new()),
+            query_output_base,
             mode,
             print_non_none,
             prelude,
             module,
             builtin_docs,
             builtin_symbols,
-            workspace_name: info.execution_root.and_then(|execroot| {
-                match PathBuf::from(execroot)
-                    .file_name()?
-                    .to_string_lossy()
-                    .to_string()
-                {
-                    name if Self::is_default_workspace_name(&name) => None,
-                    name => Some(name),
-                }
-            }),
-            external_output_base: info
-                .output_base
-                .map(|output_base| PathBuf::from(output_base).join("external")),
             client,
         })
-    }
-
-    fn is_default_workspace_name(name: &str) -> bool {
-        Self::DEFAULT_WORKSPACE_NAMES
-            .iter()
-            .any(|workspace_name| *workspace_name == name)
     }
 
     // Convert an anyhow over iterator of EvalMessage, into an iterator of EvalMessage
@@ -325,6 +309,36 @@ impl<Client: BazelClient> BazelContext<Client> {
             .into_iter()
             .map(EvalMessage::from)
     }
+
+    /// Gets the possibly-cached workspace for a directory, or creates a new one if it doesn't exist.
+    /// Returns none if a workspace cannot be found
+    fn workspace<P: AsRef<Path>>(
+        &self,
+        workspace_dir: Option<P>,
+    ) -> anyhow::Result<Option<Rc<BazelWorkspace>>> {
+        let mut workspaces = self.workspaces.borrow_mut();
+
+        if let Some(workspace_dir) = workspace_dir {
+            if let Some(workspace) = workspaces.get(workspace_dir.as_ref()) {
+                Ok(Some(workspace.clone()))
+            } else {
+                let info = self.client.info(workspace_dir.as_ref())?;
+
+                let workspace = BazelWorkspace::from_bazel_info(
+                    &workspace_dir,
+                    info,
+                    self.query_output_base.as_deref(),
+                )?;
+
+                workspaces.insert(workspace_dir.as_ref().to_owned(), Rc::new(workspace));
+
+                Ok(workspaces.get(workspace_dir.as_ref()).map(|ws| ws.clone()))
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
     pub(crate) fn file_with_contents(
         &self,
         filename: &str,
@@ -338,43 +352,18 @@ impl<Client: BazelClient> BazelContext<Client> {
         )
     }
 
-    fn get_repository_for_path<'a>(&'a self, path: &'a Path) -> Option<(Cow<'a, str>, &'a Path)> {
-        self.external_output_base
-            .as_ref()
-            .and_then(|external_output_base| path.strip_prefix(external_output_base).ok())
-            .and_then(|path| {
-                let mut path_components = path.components();
-
-                let repository_name = path_components.next()?.as_os_str().to_string_lossy();
-                let repository_path = path_components.as_path();
-
-                Some((repository_name, repository_path))
-            })
-    }
-
-    fn get_repository_for_lspurl<'a>(&'a self, url: &'a LspUrl) -> Option<Cow<'a, str>> {
-        match url {
-            LspUrl::File(path) => self.get_repository_for_path(path).map(|(repo, _)| repo),
-            _ => None,
-        }
-    }
-
     // TODO: Consider caching this
     fn repo_mapping_for_file(
         &self,
+        workspace: &BazelWorkspace,
         current_file: &LspUrl,
     ) -> anyhow::Result<HashMap<String, String>> {
-        let current_repository = self
+        let current_repository = workspace
             .get_repository_for_lspurl(current_file)
             .unwrap_or(Cow::Borrowed(""));
 
-        self.client.dump_repo_mapping(&current_repository)
-    }
-
-    fn get_repository_path(&self, repository_name: &str) -> Option<PathBuf> {
-        self.external_output_base
-            .as_ref()
-            .map(|external_output_base| external_output_base.join(repository_name))
+        self.client
+            .dump_repo_mapping(workspace, &current_repository)
     }
 
     /// Finds the directory that is the root of a package, given a label
@@ -382,7 +371,7 @@ impl<Client: BazelClient> BazelContext<Client> {
         &self,
         label: &Label,
         current_file: &LspUrl,
-        workspace_root: Option<&Path>,
+        workspace: Option<&BazelWorkspace>,
     ) -> anyhow::Result<PathBuf> {
         // Find the root we're resolving from. There's quite a few cases to consider here:
         // - `repository` is empty, and we're resolving from the workspace root.
@@ -398,10 +387,14 @@ impl<Client: BazelClient> BazelContext<Client> {
             // system information to check if we're in a known remote repository, and what the
             // root is. Fall back to the `workspace_root` otherwise.
             None => {
-                if let Some(repository_name) = self.get_repository_for_lspurl(current_file) {
-                    self.get_repository_path(&repository_name).map(Cow::Owned)
+                if let Some(repository_name) =
+                    workspace.and_then(|ws| ws.get_repository_for_lspurl(current_file))
+                {
+                    workspace
+                        .and_then(|ws| ws.get_repository_path(&repository_name))
+                        .map(Cow::Owned)
                 } else {
-                    workspace_root.map(Cow::Borrowed)
+                    workspace.map(|ws| Cow::Borrowed(&ws.root))
                 }
             }
             // We have a repository name and build system information. Check if the repository
@@ -411,16 +404,19 @@ impl<Client: BazelClient> BazelContext<Client> {
             Some(repository) => {
                 // If we are navigating to another repository, we need to apply the repo mapping.
                 // The repo mapping depends on the current repository, so resolve that first.
-                let repo_mapping = self.repo_mapping_for_file(current_file).unwrap_or_default();
+                let repo_mapping = workspace
+                    .and_then(|ws| self.repo_mapping_for_file(ws, current_file).ok())
+                    .unwrap_or_default();
 
                 let remote_repository_name = repo_mapping
                     .get(&repository.name)
                     .unwrap_or(&repository.name);
 
-                if matches!(self.workspace_name.as_ref(), Some(name) if name == &repository.name) {
-                    workspace_root.map(Cow::Borrowed)
-                } else if let Some(remote_repository_root) = self
-                    .get_repository_path(remote_repository_name)
+                if matches!(workspace, Some(ws) if ws.workspace_name.as_ref() == Some(&repository.name))
+                {
+                    workspace.map(|ws| Cow::Borrowed(&ws.root))
+                } else if let Some(remote_repository_root) = workspace
+                    .and_then(|ws| ws.get_repository_path(remote_repository_name))
                     .map(Cow::Owned)
                 {
                     Some(remote_repository_root)
@@ -459,35 +455,11 @@ impl<Client: BazelClient> BazelContext<Client> {
         }
     }
 
-    fn get_repository_names(&self) -> Vec<Cow<str>> {
-        let mut names = Vec::new();
-        if let Some(workspace_name) = &self.workspace_name {
-            names.push(Cow::Borrowed(workspace_name.as_str()));
-        }
-
-        if let Some(external_output_base) = self.external_output_base.as_ref() {
-            // Look for existing folders in `external_output_base`.
-            if let Ok(entries) = std::fs::read_dir(external_output_base) {
-                for entry in entries.flatten() {
-                    if let Ok(file_type) = entry.file_type() {
-                        if file_type.is_dir() {
-                            if let Some(name) = entry.file_name().to_str() {
-                                names.push(Cow::Owned(name.to_owned()));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        names
-    }
-
     fn get_filesystem_entries(
         &self,
         from: FilesystemCompletionRoot,
         current_file: &LspUrl,
-        workspace_root: Option<&Path>,
+        workspace: Option<&BazelWorkspace>,
         options: &FilesystemCompletionOptions,
         results: &mut Vec<StringCompletionResult>,
     ) -> anyhow::Result<()> {
@@ -496,10 +468,7 @@ impl<Client: BazelClient> BazelContext<Client> {
             FilesystemCompletionRoot::Path(path) => (path.to_owned(), ""),
             FilesystemCompletionRoot::String(str) => {
                 let label = Label::parse(str)?;
-                (
-                    self.resolve_folder(&label, current_file, workspace_root)?,
-                    str,
-                )
+                (self.resolve_folder(&label, current_file, workspace)?, str)
             }
         };
 
@@ -532,7 +501,7 @@ impl<Client: BazelClient> BazelContext<Client> {
                                 "{render_base}{}",
                                 if render_base.ends_with(':') { "" } else { ":" }
                             ),
-                            workspace_root,
+                            workspace,
                         ) {
                             results.extend(targets.into_iter().map(|target| {
                                 StringCompletionResult {
@@ -590,12 +559,11 @@ impl<Client: BazelClient> BazelContext<Client> {
     fn query_buildable_targets(
         &self,
         module: &str,
-        workspace_dir: Option<&Path>,
+        workspace: Option<&BazelWorkspace>,
     ) -> Option<Vec<String>> {
-        let output = self
-            .client
-            .query(workspace_dir, &format!("{module}*"))
-            .ok()?;
+        let workspace = workspace?;
+
+        let output = self.client.query(workspace, &format!("{module}*")).ok()?;
 
         Some(
             output
@@ -625,11 +593,12 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
         &self,
         path: &str,
         current_file: &LspUrl,
-        workspace_root: Option<&std::path::Path>,
+        workspace_root: Option<&Path>,
     ) -> anyhow::Result<LspUrl> {
         let label = Label::parse(path)?;
+        let workspace = self.workspace(workspace_root)?;
 
-        let folder = self.resolve_folder(&label, current_file, workspace_root)?;
+        let folder = self.resolve_folder(&label, current_file, workspace.as_deref())?;
 
         // Try the presumed filename first, and check if it exists.
         let presumed_path = folder.join(label.name);
@@ -655,6 +624,8 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
         current_file: &LspUrl,
         workspace_root: Option<&Path>,
     ) -> anyhow::Result<String> {
+        let workspace = self.workspace(workspace_root)?;
+
         match (target, current_file) {
             // Check whether the target and the current file are in the same package.
             (LspUrl::File(target_path), LspUrl::File(current_file_path)) if matches!((target_path.parent(), current_file_path.parent()), (Some(a), Some(b)) if a == b) =>
@@ -671,8 +642,9 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
                 // target relative to the repository root. If we can't find a repository, we'll
                 // try to resolve the target relative to the workspace root. If we don't have a
                 // workspace root, we'll just use the target path as-is.
-                let (repository, target_path) = &self
-                    .get_repository_for_path(target_path)
+                let (repository, target_path) = &workspace
+                    .as_deref()
+                    .and_then(|ws| ws.get_repository_for_path(target_path))
                     .map(|(repository, target_path)| (Some(repository), target_path))
                     .or_else(|| {
                         workspace_root
@@ -771,39 +743,47 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
         current_value: &str,
         workspace_root: Option<&Path>,
     ) -> anyhow::Result<Vec<StringCompletionResult>> {
+        let workspace = self.workspace(workspace_root)?;
+
         let offer_repository_names = current_value.is_empty()
             || current_value == "@"
             || (current_value.starts_with('@') && !current_value.contains('/'))
             || (!current_value.contains('/') && !current_value.contains(':'));
 
-        let repo_mapping = self.repo_mapping_for_file(document_uri);
+        let repo_mapping = workspace
+            .as_deref()
+            .and_then(|ws| self.repo_mapping_for_file(ws, document_uri).ok());
 
         let mut names = if offer_repository_names {
-            let repo_names = match &repo_mapping {
-                Ok(repo_mappings) => repo_mappings
-                    .keys()
-                    .filter(|key| *key != "")
-                    .map(|key| Cow::Borrowed(key.deref()))
-                    .collect(),
-                Err(_) => self.get_repository_names(),
-            };
+            if let Some(workspace) = &workspace {
+                let repo_names = match &repo_mapping {
+                    Some(repo_mappings) => repo_mappings
+                        .keys()
+                        .filter(|key| *key != "")
+                        .map(|key| Cow::Borrowed(key.deref()))
+                        .collect(),
+                    None => workspace.get_repository_names(),
+                };
 
-            repo_names
-                .into_iter()
-                .map(|name| {
-                    let name_with_at = format!("@{}", name);
-                    let insert_text = format!("{}//", &name_with_at);
+                repo_names
+                    .into_iter()
+                    .map(|name| {
+                        let name_with_at = format!("@{}", name);
+                        let insert_text = format!("{}//", &name_with_at);
 
-                    StringCompletionResult {
-                        value: name_with_at,
-                        insert_text: Some(insert_text),
-                        insert_text_offset: 0,
-                        kind: CompletionItemKind::MODULE,
-                    }
-                })
-                .collect()
+                        StringCompletionResult {
+                            value: name_with_at,
+                            insert_text: Some(insert_text),
+                            insert_text_offset: 0,
+                            kind: CompletionItemKind::MODULE,
+                        }
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            }
         } else {
-            vec![]
+            Vec::new()
         };
 
         // Complete filenames if we're not in the middle of typing a repository name:
@@ -842,7 +822,7 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
                 self.get_filesystem_entries(
                     completion_root,
                     document_uri,
-                    workspace_root,
+                    workspace.as_deref(),
                     &FilesystemCompletionOptions {
                         directories: complete_directories,
                         files: match (kind, complete_filenames) {
@@ -886,7 +866,7 @@ mod tests {
         let url = context.resolve_load(
             "//:foo.bzl",
             &LspUrl::File(fixture.external_dir("foo").join("BUILD")),
-            None,
+            Some(&fixture.workspace_root()),
         )?;
 
         assert_eq!(
@@ -905,7 +885,7 @@ mod tests {
         let url = context.resolve_load(
             "@bar//:bar.bzl",
             &LspUrl::File(fixture.external_dir("foo").join("BUILD")),
-            None,
+            Some(&fixture.workspace_root()),
         )?;
 
         assert_eq!(
@@ -924,7 +904,7 @@ mod tests {
         let url = context.resolve_load(
             "@foo//:foo.bzl",
             &LspUrl::File(fixture.workspace_root().join("BUILD")),
-            None,
+            Some(&fixture.workspace_root()),
         )?;
 
         assert_eq!(
@@ -952,7 +932,7 @@ mod tests {
         let url = context.resolve_load(
             "@rules_rust//rust:defs.bzl",
             &LspUrl::File(fixture.workspace_root().join("BUILD")),
-            None,
+            Some(&fixture.workspace_root()),
         )?;
 
         assert_eq!(

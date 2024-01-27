@@ -15,4 +15,5 @@ serde = "1.0.195"
 serde_json = "1.0.111"
 starlark = { git = "https://github.com/facebookexperimental/starlark-rust.git" }
 starlark_lsp = { git = "https://github.com/facebookexperimental/starlark-rust.git" }
+tempfile = "3.9.0"
 thiserror = "1.0.56"
