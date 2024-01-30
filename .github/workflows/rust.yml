@@ -16,7 +16,5 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: Check
-      run: cargo check --verbose
-    - name: Run tests
-      run: cargo test --verbose
+    - name: Build & Test
+      run: bazel test //...
