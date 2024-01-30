@@ -4,6 +4,7 @@ rust_binary(
     name = "bazel-lsp",
     srcs = glob(["src/**/*.rs"]),
     deps = [
+        "//src/builtin:builtin_proto_rust",
         "@crates//:anyhow",
         "@crates//:clap",
         "@crates//:either",
@@ -13,6 +14,7 @@ rust_binary(
         "@crates//:tempfile",
         "@crates//:thiserror",
     ],
+    compile_data = ["//src/builtin:builtin.pb"],
 )
 
 rust_test(

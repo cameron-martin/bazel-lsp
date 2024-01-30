@@ -32,8 +32,10 @@ use std::rc::Rc;
 use either::Either;
 use lsp_types::CompletionItemKind;
 use lsp_types::Url;
+use prost::Message;
 use starlark::analysis::find_call_name::AstModuleFindCallName;
 use starlark::analysis::AstModuleLint;
+use starlark::collections::SmallMap;
 use starlark::docs::get_registered_starlark_docs;
 use starlark::docs::render_docs_as_code;
 use starlark::docs::Doc;
@@ -52,6 +54,7 @@ use starlark_lsp::server::LspEvalResult;
 use starlark_lsp::server::LspUrl;
 use starlark_lsp::server::StringLiteralResult;
 
+use crate::builtin;
 use crate::client::BazelClient;
 use crate::eval::dialect;
 use crate::eval::globals;
@@ -541,10 +544,7 @@ impl<Client: BazelClient> BazelContext<Client> {
     ) -> Option<Vec<String>> {
         let workspace = workspace?;
 
-        let output = self
-            .client
-            .query(workspace, &format!("{module}*"))
-            .ok()?;
+        let output = self.client.query(workspace, &format!("{module}*")).ok()?;
 
         Some(
             output
@@ -705,8 +705,45 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
         }
     }
 
-    fn get_environment(&self, _uri: &LspUrl) -> DocModule {
-        DocModule::default()
+    fn get_environment(&self, uri: &LspUrl) -> DocModule {
+        let mut is_build_file = false;
+        let mut is_bzl_file = false;
+
+        if let LspUrl::File(path) = uri {
+            if let Some(extension) = path.extension() {
+                if extension == "bzl" {
+                    is_bzl_file = true;
+                }
+            }
+
+            if let Some(file_name) = path.file_name() {
+                if Self::BUILD_FILE_NAMES.iter().any(|name| *name == file_name) {
+                    is_build_file = true;
+                }
+            }
+        }
+
+        let proto = include_bytes!("builtin/builtin.pb");
+        let builtins = builtin::Builtins::decode(&proto[..]).unwrap();
+        let members: SmallMap<_, _> = builtins
+            .global
+            .iter()
+            .flat_map(|global| {
+                if global.api_context == builtin::ApiContext::All as i32
+                    || (global.api_context == builtin::ApiContext::Bzl as i32 && is_bzl_file)
+                    || (global.api_context == builtin::ApiContext::Build as i32 && is_build_file)
+                {
+                    Some((global.name.clone(), builtin::value_to_doc_member(global)))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        DocModule {
+            docs: None,
+            members,
+        }
     }
 
     fn get_url_for_global_symbol(
@@ -818,7 +855,10 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use lsp_types::CompletionItemKind;
+    use starlark::docs::DocModule;
     use starlark_lsp::{
         completion::{StringCompletionResult, StringCompletionType},
         server::{LspContext, LspUrl},
@@ -974,6 +1014,28 @@ mod tests {
         );
 
         assert_eq!(context.client.profile.borrow().query, 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_environment_contents_based_on_filename() -> anyhow::Result<()> {
+        let fixture = TestFixture::new("simple")?;
+        let context = fixture.context()?;
+
+        fn module_contains(module: &DocModule, value: &str) -> bool {
+            module.members.iter().any(|(member, _)| member == value)
+        }
+
+        let module = context.get_environment(&LspUrl::File(PathBuf::from("/foo/bar.bzl")));
+
+        assert!(!module_contains(&module, "glob"));
+        assert!(module_contains(&module, "range"));
+
+        let module = context.get_environment(&LspUrl::File(PathBuf::from("/foo/bar/BUILD")));
+
+        assert!(module_contains(&module, "glob"));
+        assert!(module_contains(&module, "range"));
 
         Ok(())
     }
