@@ -19,8 +19,22 @@ crate.from_cargo(
 )
 use_repo(crate, "crates")
 
+crate.annotation(
+    crate = "protoc-gen-prost",
+    gen_binaries = ["protoc-gen-prost"],
+)
+
+crate.annotation(
+    crate = "protoc-gen-tonic",
+    gen_binaries = ["protoc-gen-tonic"],
+)
+
 bazel_dep(
     name = "rules_bazel_integration_test",
     version = "0.23.0",
     dev_dependency = True,
 )
+
+bazel_dep(name = "protobuf", version = "23.1")
+
+register_toolchains("//prost:prost_toolchain")
