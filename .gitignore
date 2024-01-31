@@ -1,2 +1,3 @@
 /target
 /bazel-*
+/rust-project.json
