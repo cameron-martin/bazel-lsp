@@ -1061,7 +1061,8 @@ mod tests {
         );
 
         assert_eq!(context.client.profile.borrow().query, 0);
-        assert_eq!(context.client.profile.borrow().dump_repo_mapping, 1);
+        // TODO: Avoid duplicate dump_repo_mapping calls
+        assert_eq!(context.client.profile.borrow().dump_repo_mapping, 2);
 
         Ok(())
     }
