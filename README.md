@@ -2,6 +2,12 @@
 
 This is a LSP for bazel, forked from [starlark-rust](https://github.com/facebookexperimental/starlark-rust).
 
+## Features
+
+* Go to definition for identifiers & labels
+* Autocomplete for identifiers & labels
+* Auto-import (currently only for open files)
+
 ## Usage
 
 ### Installation
