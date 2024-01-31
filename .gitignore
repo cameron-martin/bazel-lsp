@@ -1,2 +1,3 @@
 /target
+/bazel-*
 /fixtures/*/root/bazel-*

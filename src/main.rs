@@ -1,4 +1,5 @@
 mod bazel;
+mod builtin;
 mod client;
 mod eval;
 mod label;
