@@ -30,7 +30,8 @@ struct Args {
     /// The directory to put the query output bases in.
     ///
     /// This is ignored if `--no-distinct-output-base` is enabled.
-    /// By default this is the OS's temp directory.
+    /// By default this is the directory `bazel-lsp` in the OS's
+    /// temp directory.
     #[arg(long)]
     query_output_base: Option<PathBuf>,
 }
@@ -41,7 +42,7 @@ fn main() -> anyhow::Result<()> {
     let query_output_base = if args.no_distinct_output_base {
         None
     } else {
-        Some(args.query_output_base.unwrap_or_else(|| env::temp_dir()))
+        Some(args.query_output_base.unwrap_or_else(|| env::temp_dir().join("bazel-lsp")))
     };
 
     let ctx = BazelContext::new(

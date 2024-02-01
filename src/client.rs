@@ -80,8 +80,7 @@ impl BazelClient for BazelCli {
     fn query(&self, workspace: &BazelWorkspace, query: &str) -> anyhow::Result<String> {
         let mut command = &mut Command::new(&self.bazel);
         if let Some(output_base) = &workspace.query_output_base {
-            eprintln!("Running bazel query in {}", output_base.path().display());
-            command = command.arg("--output_base").arg(output_base.path());
+            command = command.arg("--output_base").arg(output_base);
         }
         command = command.arg("query").arg(query);
         command = command.current_dir(&workspace.root);

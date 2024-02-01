@@ -9,14 +9,15 @@ edition = "2021"
 anyhow = "1.0.79"
 clap = { version = "4.4.18", features = ["derive"] }
 either = "1.9.0"
+hex = "0.4.3"
 itertools = "0.12.0"
 lsp-types = "0.94.1"
 prost = "0.12.3"
 prost-types = "0.12.3"
 protoc-gen-prost = "0.2.3"
 protoc-gen-tonic = "0.3.0"
+ring = "0.17.7"
 starlark = { git = "https://github.com/facebookexperimental/starlark-rust.git", branch = "main" }
 starlark_lsp = { git = "https://github.com/facebookexperimental/starlark-rust.git", branch = "main" }
-tempfile = "3.9.0"
 thiserror = "1.0.56"
 tonic = "0.10.2"

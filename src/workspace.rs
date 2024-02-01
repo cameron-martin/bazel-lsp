@@ -1,10 +1,11 @@
 use std::{
     borrow::Cow,
     io,
+    os::unix::ffi::OsStrExt,
     path::{Path, PathBuf},
 };
 
-use tempfile::TempDir;
+use ring::digest;
 
 use crate::client::BazelInfo;
 
@@ -12,7 +13,7 @@ pub struct BazelWorkspace {
     pub root: PathBuf,
     /// The output base to use for querying. This allows queries to not
     /// be blocked by concurrent builds.
-    pub query_output_base: Option<TempDir>,
+    pub query_output_base: Option<PathBuf>,
     pub workspace_name: Option<String>,
     pub external_output_base: PathBuf,
 }
@@ -34,7 +35,10 @@ impl BazelWorkspace {
                 }),
             external_output_base: PathBuf::from(info.output_base).join("external"),
             query_output_base: if let Some(output_base) = query_output_base {
-                Some(TempDir::with_prefix_in("bazel-lsp-", output_base)?)
+                let hash =
+                    digest::digest(&digest::SHA256, output_base.as_ref().as_os_str().as_bytes());
+                let hash_hex = hex::encode(&hash);
+                Some(output_base.as_ref().join(hash_hex))
             } else {
                 None
             },
