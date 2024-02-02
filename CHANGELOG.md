@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.0](https://github.com/cameron-martin/bazel-lsp/compare/v0.2.0...v0.3.0) (2024-02-02)
+
+
+### Features
+
+* Add autocomplete for bazel builtins ([#8](https://github.com/cameron-martin/bazel-lsp/issues/8)) ([bfca1db](https://github.com/cameron-martin/bazel-lsp/commit/bfca1dbb2274317b1cdfaa75f7386b259ddf4eaf))
+* Preserve output base between restarts ([fc701fb](https://github.com/cameron-martin/bazel-lsp/commit/fc701fb2d8859fdebc7231adc48e76aa0ba0b08f))
+
 ## [0.2.0](https://github.com/cameron-martin/bazel-lsp/compare/v0.1.1...v0.2.0) (2024-01-24)
 
 
