@@ -34,7 +34,7 @@ jobs:
       - name: Build & Test
         run: |
           INVOCATION_ID="$(uuidgen)"
-          echo "[View on BuildBuddy](https://bazel-lsp.buildbuddy.io/invocation/$INVOCATION_ID/)" >> "$GITHUB_STEP_SUMMARY"
+          echo "[View on BuildBuddy](https://bazel-lsp.buildbuddy.io/invocation/$INVOCATION_ID)" >> $GITHUB_STEP_SUMMARY
           bazel test //... -c opt --config=ci --invocation_id="$INVOCATION_ID"
       - uses: actions/upload-artifact@v4
         with:
