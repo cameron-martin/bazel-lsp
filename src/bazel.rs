@@ -326,11 +326,8 @@ impl<Client: BazelClient> BazelContext<Client> {
             } else {
                 let info = self.client.info(workspace_dir.as_ref())?;
 
-                let workspace = BazelWorkspace::from_bazel_info(
-                    &workspace_dir,
-                    info,
-                    self.query_output_base.as_deref(),
-                )?;
+                let workspace =
+                    BazelWorkspace::from_bazel_info(info, self.query_output_base.as_deref())?;
 
                 workspaces.insert(workspace_dir.as_ref().to_owned(), Rc::new(workspace));
 
@@ -379,7 +376,7 @@ impl<Client: BazelClient> BazelContext<Client> {
                     workspace.and_then(|ws| ws.get_repository_for_path(current_file))
                 {
                     workspace
-                        .and_then(|ws| ws.get_repository_path(&repository_name))
+                        .map(|ws| ws.get_repository_path(&repository_name))
                         .map(Cow::Owned)
                 } else {
                     workspace.map(|ws| Cow::Borrowed(&ws.root))
@@ -397,7 +394,7 @@ impl<Client: BazelClient> BazelContext<Client> {
                 {
                     workspace.map(|ws| Cow::Borrowed(&ws.root))
                 } else if let Some(remote_repository_root) = workspace
-                    .and_then(|ws| ws.get_repository_path(&repository.name))
+                    .map(|ws| ws.get_repository_path(&repository.name))
                     .map(Cow::Owned)
                 {
                     Some(remote_repository_root)
