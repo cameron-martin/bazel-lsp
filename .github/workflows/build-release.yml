@@ -33,7 +33,9 @@ jobs:
           echo "build:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> ~/.bazelrc
       - name: Build & Test
         run: |
-          bazel test //... -c opt --config=ci
+          INVOCATION_ID="$(uuid)"
+          echo "[View on BuildBuddy](https://bazel-lsp.buildbuddy.io/invocation/$INVOCATION_ID/)" >> "$GITHUB_STEP_SUMMARY"
+          bazel test //... -c opt --config=ci --invocation_id="$INVOCATION_ID"
       - uses: actions/upload-artifact@v4
         with:
           name: bazel-lsp-${{ matrix.target.name }}${{ matrix.target.extension }}
