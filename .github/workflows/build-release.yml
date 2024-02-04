@@ -1,0 +1,68 @@
+name: Rust
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ${{ matrix.target.runs-on }}
+    strategy:
+      matrix:
+        target:
+          - name: linux-amd64
+            runs-on: ubuntu-20.04
+            extension: ""
+          # - name: windows-amd64
+          #   runs-on: windows-2019
+          #   extension: .exe
+          - name: osx-amd64
+            runs-on: macos-11
+            extension: ""
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Authenticate with buildbuddy
+        env:
+          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+        run: |
+          echo "build:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> ~/.bazelrc
+      - name: Build & Test
+        run: |
+          INVOCATION_ID="$(uuidgen)"
+          echo "[View on BuildBuddy](https://bazel-lsp.buildbuddy.io/invocation/$INVOCATION_ID)" >> $GITHUB_STEP_SUMMARY
+          bazel test //... -c opt --config=ci --invocation_id="$INVOCATION_ID"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bazel-lsp-${{ matrix.target.name }}${{ matrix.target.extension }}
+          path: bazel-bin/bazel-lsp${{ matrix.target.extension }}
+  release:
+    if: github.ref == 'refs/heads/master'
+    name: Release
+    needs: [build-and-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: google-github-actions/release-please-action@v4
+        id: release
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          release-type: rust
+      - uses: actions/download-artifact@v4
+        if: ${{ steps.release.outputs.release_created }}
+        with:
+          path: releases
+          pattern: bazel-lsp-*
+      - name: Add version to artifacts
+        if: ${{ steps.release.outputs.release_created }}
+        run: |
+          VERSION=${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}
+          find releases -type f -exec bash -c 'mv "$1" "${1/bazel-lsp-/bazel-lsp-"$VERSION"-}"' _ '{}' \;
+      - name: Upload Release Artifacts
+        if: ${{ steps.release.outputs.release_created }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload ${{ steps.release.outputs.tag_name }} ./releases/*

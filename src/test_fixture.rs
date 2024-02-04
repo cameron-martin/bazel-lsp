@@ -43,10 +43,11 @@ impl TestFixture {
         Ok(ContextBuilder {
             client: MockBazel {
                 info: BazelInfo {
-                    output_base: Some(path_to_string(self.output_base())?),
-                    execution_root: Some(path_to_string(
+                    output_base: path_to_string(self.output_base())?,
+                    execution_root: path_to_string(
                         self.output_base().join("execroot").join("root"),
-                    )?),
+                    )?,
+                    workspace: path_to_string(self.workspace_root())?,
                 },
                 queries: HashMap::new(),
                 repo_mappings: HashMap::new(),

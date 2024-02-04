@@ -11,8 +11,9 @@ use crate::workspace::BazelWorkspace;
 
 #[derive(Clone)]
 pub(crate) struct BazelInfo {
-    pub(crate) execution_root: Option<String>,
-    pub(crate) output_base: Option<String>,
+    pub(crate) execution_root: String,
+    pub(crate) output_base: String,
+    pub(crate) workspace: String,
 }
 
 /// A client for interacting with the build system. This is used for testing,
@@ -54,19 +55,28 @@ impl BazelClient for BazelCli {
         let output = String::from_utf8(output.stdout)?;
         let mut execution_root = None;
         let mut output_base = None;
+        let mut workspace = None;
         for line in output.lines() {
             if let Some((key, value)) = line.split_once(": ") {
                 match key {
                     "execution_root" => execution_root = Some(value),
                     "output_base" => output_base = Some(value),
+                    "workspace" => workspace = Some(value),
                     _ => {}
                 }
             }
         }
 
         Ok(BazelInfo {
-            execution_root: execution_root.map(|x| x.into()),
-            output_base: output_base.map(|x| x.into()),
+            execution_root: execution_root
+                .ok_or_else(|| anyhow!("Cannot find execution_root info"))?
+                .into(),
+            output_base: output_base
+                .ok_or_else(|| anyhow!("Cannot find output_base info"))?
+                .into(),
+            workspace: workspace
+                .ok_or_else(|| anyhow!("Cannot find workspace info"))?
+                .into(),
         })
     }
 
@@ -77,7 +87,7 @@ impl BazelClient for BazelCli {
     ) -> anyhow::Result<HashMap<String, String>> {
         let mut command = &mut Command::new(&self.bazel);
         if let Some(output_base) = &workspace.query_output_base {
-            command = command.arg("--output_base").arg(output_base.path());
+            command = command.arg("--output_base").arg(output_base);
         }
         command = command
             .args(["mod", "dump_repo_mapping"])
@@ -96,7 +106,7 @@ impl BazelClient for BazelCli {
     fn query(&self, workspace: &BazelWorkspace, query: &str) -> anyhow::Result<String> {
         let mut command = &mut Command::new(&self.bazel);
         if let Some(output_base) = &workspace.query_output_base {
-            command = command.arg("--output_base").arg(output_base.path());
+            command = command.arg("--output_base").arg(output_base);
         }
         command = command.arg("query").arg(query);
         command = command.current_dir(&workspace.root);

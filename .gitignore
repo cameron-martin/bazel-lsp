@@ -1,3 +1,4 @@
 /target
 /bazel-*
 /fixtures/*/root/bazel-*
+/MODULE.bazel.lock

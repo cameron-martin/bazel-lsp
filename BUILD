@@ -9,11 +9,12 @@ rust_binary(
         "@crates//:anyhow",
         "@crates//:clap",
         "@crates//:either",
+        "@crates//:hex",
         "@crates//:lsp-types",
+        "@crates//:ring",
         "@crates//:serde_json",
         "@crates//:starlark",
         "@crates//:starlark_lsp",
-        "@crates//:tempfile",
         "@crates//:thiserror",
     ],
 )
