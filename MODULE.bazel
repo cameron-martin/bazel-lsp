@@ -1,5 +1,7 @@
 bazel_dep(name = "rules_rust", version = "0.38.0")
 
+git_override(module_name = "rules_rust", remote = "https://github.com/bazelbuild/rules_rust.git", commit = "c06564d1bbd164b0f0561a4a450cb3460f1d5a93")
+
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 rust.toolchain(
     edition = "2021",
