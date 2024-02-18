@@ -1,3 +1,4 @@
 /target
 /bazel-*
 /MODULE.bazel.lock
+/rust-project.json
