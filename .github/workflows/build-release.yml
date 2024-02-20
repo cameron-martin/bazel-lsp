@@ -59,11 +59,11 @@ jobs:
         with:
           path: releases
           pattern: bazel-lsp-*
-      - name: Add version to artifacts
+      - name: Rename artifacts
         if: ${{ steps.release.outputs.release_created }}
         run: |
           VERSION=${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}
-          find releases -type f -exec bash -c 'mv "$1" "${1/bazel-lsp-/bazel-lsp-"$VERSION"-}"' _ '{}' \;
+          find releases -type f -exec bash -c 'TARGET="${1/bazel-lsp-/bazel-lsp-"$VERSION"-}"; BASENAME="$(basename "$1")"; mv "$1" "$(dirname "$TARGET")${BASENAME/bazel-lsp/}";' _ '{}' \;
       - name: Upload Release Artifacts
         if: ${{ steps.release.outputs.release_created }}
         env:
