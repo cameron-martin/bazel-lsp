@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/cameron-martin/bazel-lsp/compare/v0.3.0...v0.3.1) (2024-02-20)
+
+
+### Bug Fixes
+
+* Update starlark crates ([#20](https://github.com/cameron-martin/bazel-lsp/issues/20)) ([335551a](https://github.com/cameron-martin/bazel-lsp/commit/335551ac22cc1bf516cb5735063ffd8519deeb29))
+
 ## [0.3.0](https://github.com/cameron-martin/bazel-lsp/compare/v0.2.0...v0.3.0) (2024-02-02)
 
 
