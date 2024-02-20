@@ -54,6 +54,8 @@ jobs:
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           release-type: rust
+      - uses: actions/checkout@v4
+        if: ${{ steps.release.outputs.release_created }}
       - uses: actions/download-artifact@v4
         if: ${{ steps.release.outputs.release_created }}
         with:
