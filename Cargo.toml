@@ -17,7 +17,7 @@ prost-types = "0.12.3"
 protoc-gen-prost = "0.2.3"
 protoc-gen-tonic = "0.3.0"
 ring = "0.17.7"
-starlark = { git = "https://github.com/facebookexperimental/starlark-rust.git", branch = "main" }
-starlark_lsp = { git = "https://github.com/facebookexperimental/starlark-rust.git", branch = "main" }
+starlark = { git = "https://github.com/facebookexperimental/starlark-rust.git", rev = "cf5e6b8cb8bb364c8c49b67080e510916c502d4b" }
+starlark_lsp = { git = "https://github.com/facebookexperimental/starlark-rust.git", rev = "cf5e6b8cb8bb364c8c49b67080e510916c502d4b" }
 thiserror = "1.0.56"
 tonic = "0.10.2"
