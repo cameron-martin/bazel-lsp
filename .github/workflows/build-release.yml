@@ -22,6 +22,9 @@ jobs:
           - name: osx-amd64
             runs-on: macos-11
             extension: ""
+          - name: osx-arm64
+            runs-on: macos-14
+            extension: ""
       fail-fast: false
 
     steps:
@@ -51,16 +54,18 @@ jobs:
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           release-type: rust
+      - uses: actions/checkout@v4
+        if: ${{ steps.release.outputs.release_created }}
       - uses: actions/download-artifact@v4
         if: ${{ steps.release.outputs.release_created }}
         with:
           path: releases
           pattern: bazel-lsp-*
-      - name: Add version to artifacts
+      - name: Rename artifacts
         if: ${{ steps.release.outputs.release_created }}
         run: |
           VERSION=${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}
-          find releases -type f -exec bash -c 'mv "$1" "${1/bazel-lsp-/bazel-lsp-"$VERSION"-}"' _ '{}' \;
+          find releases -type f -exec bash -c 'TARGET="${1/bazel-lsp-/bazel-lsp-"$VERSION"-}"; BASENAME="$(basename "$1")"; mv "$1" "$(dirname "$TARGET")${BASENAME/bazel-lsp/}";' _ '{}' \;
       - name: Upload Release Artifacts
         if: ${{ steps.release.outputs.release_created }}
         env:

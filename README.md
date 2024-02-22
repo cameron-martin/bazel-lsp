@@ -22,8 +22,6 @@ bazel build //:bazel-lsp -c opt
 
 ### VSCode
 
-Note: This requires a currently-unreleased version > 0.8.1 (with https://github.com/bazelbuild/vscode-bazel/pull/317 in it) to work.
-
 Ensure you have the [Bazel extension](https://marketplace.visualstudio.com/items?itemName=BazelBuild.vscode-bazel) installed, and add the following config to your user `settings.json`:
 
 ```json
