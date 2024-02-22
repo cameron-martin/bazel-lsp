@@ -6,6 +6,7 @@ use std::{
 };
 
 use ring::digest;
+use starlark_lsp::server::LspUrl;
 
 use crate::client::BazelInfo;
 
@@ -18,7 +19,13 @@ pub struct BazelWorkspace {
     pub external_output_base: PathBuf,
 }
 
-const DEFAULT_WORKSPACE_NAME: &'static str = "__main__";
+const DEFAULT_WORKSPACE_NAMES: [&'static str; 2] = ["__main__", "_main"];
+
+fn is_default_workspace_name(name: &str) -> bool {
+    DEFAULT_WORKSPACE_NAMES
+        .iter()
+        .any(|workspace_name| *workspace_name == name)
+}
 
 impl BazelWorkspace {
     pub fn from_bazel_info<P: AsRef<Path>>(
@@ -30,7 +37,7 @@ impl BazelWorkspace {
             workspace_name: PathBuf::from(info.execution_root)
                 .file_name()
                 .and_then(|name| match name.to_string_lossy().to_string() {
-                    name if name == DEFAULT_WORKSPACE_NAME => None,
+                    name if is_default_workspace_name(&name) => None,
                     name => Some(name),
                 }),
             external_output_base: PathBuf::from(info.output_base).join("external"),
@@ -59,6 +66,13 @@ impl BazelWorkspace {
 
                 Some((repository_name, repository_path))
             })
+    }
+
+    pub fn get_repository_for_lspurl<'a>(&'a self, url: &'a LspUrl) -> Option<Cow<'a, str>> {
+        match url {
+            LspUrl::File(path) => self.get_repository_for_path(path).map(|(repo, _)| repo),
+            _ => None,
+        }
     }
 
     pub fn get_repository_path(&self, repository_name: &str) -> PathBuf {

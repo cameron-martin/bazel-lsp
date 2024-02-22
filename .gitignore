@@ -2,3 +2,4 @@
 /bazel-*
 /MODULE.bazel.lock
 /rust-project.json
+/fixtures/*/root/bazel-*

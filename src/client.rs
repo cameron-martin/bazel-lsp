@@ -1,11 +1,9 @@
 use std::{
     cell::RefCell,
+    collections::HashMap,
     path::{Path, PathBuf},
     process::Command,
 };
-
-#[cfg(test)]
-use std::collections::HashMap;
 
 use anyhow::anyhow;
 
@@ -23,6 +21,11 @@ pub(crate) struct BazelInfo {
 /// it involves spawning a server and each invocation takes a workspace-level lock.
 pub(crate) trait BazelClient {
     fn info(&self, workspace_root: &Path) -> anyhow::Result<BazelInfo>;
+    fn dump_repo_mapping(
+        &self,
+        workspace: &BazelWorkspace,
+        repo: &str,
+    ) -> anyhow::Result<HashMap<String, String>>;
     fn query(&self, workspace: &BazelWorkspace, query: &str) -> anyhow::Result<String>;
 }
 
@@ -40,13 +43,13 @@ impl BazelCli {
 
 impl BazelClient for BazelCli {
     fn info(&self, workspace_root: &Path) -> anyhow::Result<BazelInfo> {
-        let mut raw_command = Command::new(&self.bazel);
-        let mut command = raw_command.arg("info");
-        command = command.current_dir(workspace_root);
+        let output = Command::new(&self.bazel)
+            .arg("info")
+            .current_dir(workspace_root)
+            .output()?;
 
-        let output = command.output()?;
         if !output.status.success() {
-            return Err(anyhow::anyhow!("Command `bazel info` failed"));
+            return Err(anyhow!("Command `bazel info` failed"));
         }
 
         let output = String::from_utf8(output.stdout)?;
@@ -77,6 +80,29 @@ impl BazelClient for BazelCli {
         })
     }
 
+    fn dump_repo_mapping(
+        &self,
+        workspace: &BazelWorkspace,
+        repo: &str,
+    ) -> anyhow::Result<HashMap<String, String>> {
+        let mut command = &mut Command::new(&self.bazel);
+        if let Some(output_base) = &workspace.query_output_base {
+            command = command.arg("--output_base").arg(output_base);
+        }
+        command = command
+            .args(["mod", "dump_repo_mapping"])
+            .arg(repo)
+            .current_dir(&workspace.root);
+
+        let output = command.output()?;
+
+        if !output.status.success() {
+            return Err(anyhow!("Command `bazel mod dump_repo_mapping` failed"));
+        }
+
+        Ok(serde_json::from_slice(&output.stdout)?)
+    }
+
     fn query(&self, workspace: &BazelWorkspace, query: &str) -> anyhow::Result<String> {
         let mut command = &mut Command::new(&self.bazel);
         if let Some(output_base) = &workspace.query_output_base {
@@ -97,6 +123,7 @@ impl BazelClient for BazelCli {
 #[derive(Default)]
 pub struct Profile {
     pub info: u16,
+    pub dump_repo_mapping: u16,
     pub query: u16,
 }
 
@@ -123,6 +150,16 @@ impl<InnerClient: BazelClient> BazelClient for ProfilingClient<InnerClient> {
         self.inner.info(workspace_root)
     }
 
+    fn dump_repo_mapping(
+        &self,
+        workspace: &BazelWorkspace,
+        repo: &str,
+    ) -> anyhow::Result<HashMap<String, String>> {
+        self.profile.borrow_mut().dump_repo_mapping += 1;
+
+        self.inner.dump_repo_mapping(workspace, repo)
+    }
+
     fn query(&self, workspace: &BazelWorkspace, query: &str) -> anyhow::Result<String> {
         self.profile.borrow_mut().query += 1;
 
@@ -133,6 +170,7 @@ impl<InnerClient: BazelClient> BazelClient for ProfilingClient<InnerClient> {
 #[cfg(test)]
 pub(crate) struct MockBazel {
     pub(crate) info: BazelInfo,
+    pub(crate) repo_mappings: HashMap<String, HashMap<String, String>>,
     pub(crate) queries: HashMap<String, String>,
 }
 
@@ -140,6 +178,18 @@ pub(crate) struct MockBazel {
 impl BazelClient for MockBazel {
     fn info(&self, _workspace_root: &Path) -> anyhow::Result<BazelInfo> {
         Ok(self.info.clone())
+    }
+
+    fn dump_repo_mapping(
+        &self,
+        _workspace: &BazelWorkspace,
+        repo: &str,
+    ) -> anyhow::Result<HashMap<String, String>> {
+        Ok(self
+            .repo_mappings
+            .get(repo)
+            .ok_or_else(|| anyhow!("Cannot find repo mapping"))?
+            .clone())
     }
 
     fn query(&self, _workspace: &BazelWorkspace, query: &str) -> anyhow::Result<String> {

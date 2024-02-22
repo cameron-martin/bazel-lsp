@@ -25,6 +25,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::io;
 use std::iter;
+use std::ops::Deref;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -351,6 +352,20 @@ impl<Client: BazelClient> BazelContext<Client> {
         )
     }
 
+    // TODO: Consider caching this
+    fn repo_mapping_for_file(
+        &self,
+        workspace: &BazelWorkspace,
+        current_file: &LspUrl,
+    ) -> anyhow::Result<HashMap<String, String>> {
+        let current_repository = workspace
+            .get_repository_for_lspurl(current_file)
+            .unwrap_or(Cow::Borrowed(""));
+
+        self.client
+            .dump_repo_mapping(workspace, &current_repository)
+    }
+
     /// Finds the directory that is the root of a package, given a label
     fn resolve_folder<'a>(
         &self,
@@ -367,13 +382,13 @@ impl<Client: BazelClient> BazelContext<Client> {
         // Also with all of these cases, we need to consider if we have build system
         // information or not. If not, we can't resolve any remote repositories, and we can't
         // know whether a repository name refers to the workspace or not.
-        let resolve_root = match (&label.repo, current_file) {
-            // Repository is empty, and we know what file we're resolving from. Use the build
+        let resolve_root = match &label.repo {
+            // Repository is empty. If we know what file we're resolving from, use the build
             // system information to check if we're in a known remote repository, and what the
             // root is. Fall back to the `workspace_root` otherwise.
-            (None, LspUrl::File(current_file)) => {
-                if let Some((repository_name, _)) =
-                    workspace.and_then(|ws| ws.get_repository_for_path(current_file))
+            None => {
+                if let Some(repository_name) =
+                    workspace.and_then(|ws| ws.get_repository_for_lspurl(current_file))
                 {
                     workspace
                         .map(|ws| ws.get_repository_path(&repository_name))
@@ -382,19 +397,26 @@ impl<Client: BazelClient> BazelContext<Client> {
                     workspace.map(|ws| Cow::Borrowed(&ws.root))
                 }
             }
-            // No repository in the load path, and we don't have build system information, or
-            // an `LspUrl` we can't use to check the root. Use the workspace root.
-            (None, _) => workspace.map(|ws| Cow::Borrowed(&ws.root)),
             // We have a repository name and build system information. Check if the repository
             // name refers to the workspace, and if so, use the workspace root. If not, check
             // if it refers to a known remote repository, and if so, use that root.
             // Otherwise, fail with an error.
-            (Some(repository), _) => {
+            Some(repository) => {
+                // If we are navigating to another repository, we need to apply the repo mapping.
+                // The repo mapping depends on the current repository, so resolve that first.
+                let repo_mapping = workspace
+                    .and_then(|ws| self.repo_mapping_for_file(ws, current_file).ok())
+                    .unwrap_or_default();
+
+                let remote_repository_name = repo_mapping
+                    .get(&repository.name)
+                    .unwrap_or(&repository.name);
+
                 if matches!(workspace, Some(ws) if ws.workspace_name.as_ref() == Some(&repository.name))
                 {
                     workspace.map(|ws| Cow::Borrowed(&ws.root))
                 } else if let Some(remote_repository_root) = workspace
-                    .map(|ws| ws.get_repository_path(&repository.name))
+                    .map(|ws| ws.get_repository_path(remote_repository_name))
                     .map(Cow::Owned)
                 {
                     Some(remote_repository_root)
@@ -765,10 +787,22 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
             || (current_value.starts_with('@') && !current_value.contains('/'))
             || (!current_value.contains('/') && !current_value.contains(':'));
 
+        let repo_mapping = workspace
+            .as_deref()
+            .and_then(|ws| self.repo_mapping_for_file(ws, document_uri).ok());
+
         let mut names = if offer_repository_names {
             if let Some(workspace) = &workspace {
-                workspace
-                    .get_repository_names()
+                let repo_names = match &repo_mapping {
+                    Some(repo_mappings) => repo_mappings
+                        .keys()
+                        .filter(|key| *key != "")
+                        .map(|key| Cow::Borrowed(key.deref()))
+                        .collect(),
+                    None => workspace.get_repository_names(),
+                };
+
+                repo_names
                     .into_iter()
                     .map(|name| {
                         let name_with_at = format!("@{}", name);
@@ -855,6 +889,7 @@ mod tests {
     use std::path::PathBuf;
 
     use lsp_types::CompletionItemKind;
+    use serde_json::json;
     use starlark::docs::DocModule;
     use starlark_lsp::{
         completion::{StringCompletionResult, StringCompletionType},
@@ -916,6 +951,115 @@ mod tests {
             url,
             LspUrl::File(fixture.external_dir("foo").join("foo.bzl"))
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn external_resolve_load_in_bzlmod_workspace() -> anyhow::Result<()> {
+        let fixture = TestFixture::new("bzlmod")?;
+        let context = fixture
+            .context_builder()?
+            .repo_mapping_json(
+                "",
+                json!({
+                    "": "",
+                    "rules_rust": "rules_rust~0.36.2",
+                }),
+            )?
+            .build()?;
+
+        let url = context.resolve_load(
+            "@rules_rust//rust:defs.bzl",
+            &LspUrl::File(fixture.workspace_root().join("BUILD")),
+            Some(&fixture.workspace_root()),
+        )?;
+
+        assert_eq!(
+            url,
+            LspUrl::File(
+                fixture
+                    .external_dir("rules_rust~0.36.2")
+                    .join("rust")
+                    .join("defs.bzl")
+            )
+        );
+
+        assert_eq!(context.client.profile.borrow().dump_repo_mapping, 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_completion_for_repositories_in_root_workspace_with_bzlmod() -> anyhow::Result<()> {
+        let fixture = TestFixture::new("bzlmod")?;
+        let context = fixture
+            .context_builder()?
+            .repo_mapping_json(
+                "",
+                json!({
+                    "": "",
+                    "rules_rust": "rules_rust~0.36.2",
+                }),
+            )?
+            .build()?;
+
+        let completions = context.get_string_completion_options(
+            &LspUrl::File(fixture.workspace_root().join("BUILD")),
+            StringCompletionType::String,
+            "@rules_ru",
+            Some(&fixture.workspace_root()),
+        )?;
+
+        assert_eq!(
+            completions[0],
+            StringCompletionResult {
+                value: "@rules_rust".into(),
+                insert_text: Some("@rules_rust//".into()),
+                insert_text_offset: 0,
+                kind: CompletionItemKind::MODULE,
+            }
+        );
+
+        assert_eq!(context.client.profile.borrow().dump_repo_mapping, 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_completion_for_packages_in_root_workspace_with_bzlmod() -> anyhow::Result<()> {
+        let fixture = TestFixture::new("bzlmod")?;
+        let context = fixture
+            .context_builder()?
+            .repo_mapping_json(
+                "",
+                json!({
+                    "": "",
+                    "rules_rust": "rules_rust~0.36.2",
+                }),
+            )?
+            .build()?;
+
+        let completions = context.get_string_completion_options(
+            &LspUrl::File(fixture.workspace_root().join("BUILD")),
+            StringCompletionType::LoadPath,
+            "@rules_rust//",
+            Some(&fixture.workspace_root()),
+        )?;
+
+        assert_eq!(
+            completions[0],
+            StringCompletionResult {
+                value: "rust".into(),
+                insert_text: Some("rust".into()),
+                insert_text_offset: "@rules_rust//".len(),
+                kind: CompletionItemKind::FOLDER,
+            }
+        );
+
+        assert_eq!(context.client.profile.borrow().query, 0);
+        // TODO: Avoid duplicate dump_repo_mapping calls
+        assert_eq!(context.client.profile.borrow().dump_repo_mapping, 2);
 
         Ok(())
     }

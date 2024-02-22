@@ -12,6 +12,7 @@ rust_binary(
         "@crates//:hex",
         "@crates//:lsp-types",
         "@crates//:ring",
+        "@crates//:serde_json",
         "@crates//:starlark",
         "@crates//:starlark_lsp",
         "@crates//:thiserror",

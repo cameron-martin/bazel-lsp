@@ -50,6 +50,7 @@ impl TestFixture {
                     workspace: path_to_string(self.workspace_root())?,
                 },
                 queries: HashMap::new(),
+                repo_mappings: HashMap::new(),
             },
             mode: ContextMode::Check,
             print_non_none: true,
@@ -72,6 +73,12 @@ impl ContextBuilder {
         self.client.queries.insert(query.into(), result.into());
 
         self
+    }
+
+    pub(crate) fn repo_mapping_json(mut self, repo: &str, mapping: serde_json::Value) -> anyhow::Result<Self> {
+        self.client.repo_mappings.insert(repo.into(), serde_json::from_value(mapping)?);
+
+        Ok(self)
     }
 
     pub(crate) fn build(self) -> anyhow::Result<BazelContext<ProfilingClient<MockBazel>>> {
