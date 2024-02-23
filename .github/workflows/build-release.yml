@@ -44,7 +44,6 @@ jobs:
           name: bazel-lsp-${{ matrix.target.name }}${{ matrix.target.extension }}
           path: bazel-bin/bazel-lsp${{ matrix.target.extension }}
   release:
-    if: github.ref == 'refs/heads/master'
     name: Release
     needs: [build-and-test]
     runs-on: ubuntu-latest
@@ -54,20 +53,22 @@ jobs:
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           release-type: rust
+        if: github.ref == 'refs/heads/master'
       - uses: actions/checkout@v4
-        if: ${{ steps.release.outputs.release_created }}
       - uses: actions/download-artifact@v4
-        if: ${{ steps.release.outputs.release_created }}
         with:
           path: releases
           pattern: bazel-lsp-*
       - name: Rename artifacts
-        if: ${{ steps.release.outputs.release_created }}
         run: |
-          VERSION=${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}
+          VERSION=${{ steps.release.outputs.major || 0 }}.${{ steps.release.outputs.minor || 0 }}.${{ steps.release.outputs.patch || 0 }}
           find releases -type f -exec bash -c 'TARGET="${1/bazel-lsp-/bazel-lsp-"$VERSION"-}"; BASENAME="$(basename "$1")"; mv "$1" "$(dirname "$TARGET")${BASENAME/bazel-lsp/}";' _ '{}' \;
+      - name: Show Release Artifacts
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: find releases -type f
       - name: Upload Release Artifacts
         if: ${{ steps.release.outputs.release_created }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
         run: gh release upload ${{ steps.release.outputs.tag_name }} ./releases/*
