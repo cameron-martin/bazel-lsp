@@ -39,6 +39,12 @@ jobs:
           INVOCATION_ID="$(uuidgen)"
           echo "[View on BuildBuddy](https://bazel-lsp.buildbuddy.io/invocation/$INVOCATION_ID)" >> $GITHUB_STEP_SUMMARY
           bazel test //... -c opt --config=ci --invocation_id="$INVOCATION_ID"
+        if: runner.os != 'Windows'
+      - name: Build & Test
+        run: |
+          $InvocationId = New-Guid
+          bazel test //... -c opt --config=ci --invocation_id="$InvocationId"
+        if: runner.os == 'Windows'
       - uses: actions/upload-artifact@v4
         with:
           name: bazel-lsp-${{ matrix.target.name }}${{ matrix.target.extension }}
