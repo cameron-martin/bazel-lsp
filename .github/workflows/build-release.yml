@@ -62,7 +62,13 @@ jobs:
       - name: Rename artifacts
         run: |
           VERSION=${{ steps.release.outputs.major || 0 }}.${{ steps.release.outputs.minor || 0 }}.${{ steps.release.outputs.patch || 0 }}
-          find releases -type f -exec bash -c 'TARGET="${1/bazel-lsp-/bazel-lsp-"$VERSION"-}"; BASENAME="$(basename "$1")"; mv "$1" "$(dirname "$TARGET")${BASENAME/bazel-lsp/}";' _ '{}' \;
+          files="$(find releases -type f)"
+          for file in $files; do
+            basename="$(basename $file)"
+            extension="${basename/bazel-lsp/}"
+            dirname="$(dirname $file)"
+            mv "$file" "${dirname/bazel-lsp-/bazel-lsp-${version}-}${extension}"
+          done
       - name: Show Release Artifacts
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
