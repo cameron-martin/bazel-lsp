@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/cameron-martin/bazel-lsp/compare/v0.3.1...v0.4.0) (2024-02-23)
+
+
+### Features
+
+* Add bzlmod support ([#1](https://github.com/cameron-martin/bazel-lsp/issues/1)) ([9599b7d](https://github.com/cameron-martin/bazel-lsp/commit/9599b7d6a00e5e364599b5c2d8cc374ed16d8307))
+
 ## [0.3.1](https://github.com/cameron-martin/bazel-lsp/compare/v0.3.0...v0.3.1) (2024-02-20)
 
 
