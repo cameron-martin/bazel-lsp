@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/cameron-martin/bazel-lsp/compare/v0.4.0...v0.4.1) (2024-02-25)
+
+
+### Bug Fixes
+
+* Go to definition in external repositories ([#26](https://github.com/cameron-martin/bazel-lsp/issues/26)) ([e80ba05](https://github.com/cameron-martin/bazel-lsp/commit/e80ba05128ce7a1bbc3b5b918fa2bff997c2b187)), closes [#25](https://github.com/cameron-martin/bazel-lsp/issues/25)
+
 ## [0.4.0](https://github.com/cameron-martin/bazel-lsp/compare/v0.3.1...v0.4.0) (2024-02-23)
 
 
