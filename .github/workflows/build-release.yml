@@ -68,9 +68,10 @@ jobs:
             extension="${basename/bazel-lsp/}"
             dirname="$(dirname $file)"
             mv "$file" "${dirname/bazel-lsp-/bazel-lsp-${version}-}${extension}"
+            rmdir "$dirname"
           done
       - name: Show Release Artifacts
-        run: find releases -type f
+        run: find releases
       - name: Upload Release Artifacts
         if: ${{ steps.release.outputs.release_created }}
         env:
