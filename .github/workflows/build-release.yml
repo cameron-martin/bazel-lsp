@@ -29,11 +29,19 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - name: Authenticate with buildbuddy
+      - name: Set up bazelrc
         env:
           BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
         run: |
           echo "build:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> ~/.bazelrc
+          echo "startup --output_base=$RUNNER_TEMP/.bazel/output_base" >> ~/.bazelrc
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ${{ runner.temp }}/.bazel/output_base/external
+          key: bazel-${{ matrix.target.name }}-${{ github.ref }}
+          restore-keys:
+            bazel-${{ matrix.target.name }}-refs/heads/master
       - name: Build & Test
         run: |
           INVOCATION_ID="$(uuidgen)"
