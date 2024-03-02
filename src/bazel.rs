@@ -314,12 +314,19 @@ impl<Client: BazelClient> BazelContext<Client> {
     }
 
     /// Gets the possibly-cached workspace for a directory, or creates a new one if it doesn't exist.
-    /// Returns none if a workspace cannot be found
+    /// If the workspace is not given, it is inferred based on the current file.
+    /// Returns None if a workspace cannot be found.
     fn workspace<P: AsRef<Path>>(
         &self,
         workspace_dir: Option<P>,
+        current_file: &LspUrl,
     ) -> anyhow::Result<Option<Rc<BazelWorkspace>>> {
         let mut workspaces = self.workspaces.borrow_mut();
+
+        let workspace_dir = match workspace_dir.as_ref() {
+            Some(workspace_dir) => Some(Cow::Borrowed(workspace_dir.as_ref())),
+            None => self.infer_workspace_dir(current_file)?.map(Cow::Owned),
+        };
 
         if let Some(workspace_dir) = workspace_dir {
             if let Some(workspace) = workspaces.get(workspace_dir.as_ref()) {
@@ -334,6 +341,21 @@ impl<Client: BazelClient> BazelContext<Client> {
 
                 Ok(workspaces.get(workspace_dir.as_ref()).map(|ws| ws.clone()))
             }
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn infer_workspace_dir(&self, current_file: &LspUrl) -> io::Result<Option<PathBuf>> {
+        if let LspUrl::File(path) = current_file {
+            for dir in path.ancestors().skip(1) {
+                let file = dir.join("DO_NOT_BUILD_HERE");
+                if file.exists() {
+                    return Ok(Some(PathBuf::from(fs::read_to_string(file)?)));
+                }
+            }
+
+            Ok(None)
         } else {
             Ok(None)
         }
@@ -596,7 +618,7 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
         workspace_root: Option<&Path>,
     ) -> anyhow::Result<LspUrl> {
         let label = Label::parse(path)?;
-        let workspace = self.workspace(workspace_root)?;
+        let workspace = self.workspace(workspace_root, current_file)?;
 
         let folder = self.resolve_folder(&label, current_file, workspace.as_deref())?;
 
@@ -624,7 +646,7 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
         current_file: &LspUrl,
         workspace_root: Option<&Path>,
     ) -> anyhow::Result<String> {
-        let workspace = self.workspace(workspace_root)?;
+        let workspace = self.workspace(workspace_root, current_file)?;
 
         match (target, current_file) {
             // Check whether the target and the current file are in the same package.
@@ -780,7 +802,7 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
         current_value: &str,
         workspace_root: Option<&Path>,
     ) -> anyhow::Result<Vec<StringCompletionResult>> {
-        let workspace = self.workspace(workspace_root)?;
+        let workspace = self.workspace(workspace_root, document_uri)?;
 
         let offer_repository_names = current_value.is_empty()
             || current_value == "@"
@@ -906,7 +928,7 @@ mod tests {
         let url = context.resolve_load(
             "//:foo.bzl",
             &LspUrl::File(fixture.external_dir("foo").join("BUILD")),
-            Some(&fixture.workspace_root()),
+            None,
         )?;
 
         assert_eq!(
@@ -925,7 +947,7 @@ mod tests {
         let url = context.resolve_load(
             "@bar//:bar.bzl",
             &LspUrl::File(fixture.external_dir("foo").join("BUILD")),
-            Some(&fixture.workspace_root()),
+            None,
         )?;
 
         assert_eq!(

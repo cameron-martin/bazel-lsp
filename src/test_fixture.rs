@@ -17,10 +17,17 @@ pub struct TestFixture {
 }
 
 impl TestFixture {
-    pub fn new(name: &str) -> io::Result<TestFixture> {
-        Ok(TestFixture {
+    pub fn new(name: &str) -> anyhow::Result<TestFixture> {
+        let fixture = TestFixture {
             path: fs::canonicalize(PathBuf::from(".").join("fixtures").join(name))?,
-        })
+        };
+
+        fs::write(
+            fixture.output_base().join("DO_NOT_BUILD_HERE"),
+            path_to_string(fixture.workspace_root())?,
+        )?;
+
+        Ok(fixture)
     }
 
     pub fn output_base(&self) -> PathBuf {
@@ -75,8 +82,14 @@ impl ContextBuilder {
         self
     }
 
-    pub(crate) fn repo_mapping_json(mut self, repo: &str, mapping: serde_json::Value) -> anyhow::Result<Self> {
-        self.client.repo_mappings.insert(repo.into(), serde_json::from_value(mapping)?);
+    pub(crate) fn repo_mapping_json(
+        mut self,
+        repo: &str,
+        mapping: serde_json::Value,
+    ) -> anyhow::Result<Self> {
+        self.client
+            .repo_mappings
+            .insert(repo.into(), serde_json::from_value(mapping)?);
 
         Ok(self)
     }
