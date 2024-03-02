@@ -39,9 +39,9 @@ jobs:
         with:
           path: |
             ${{ runner.temp }}/.bazel/output_base/external
-          key: bazel-${{ runner.os }}-${{ github.ref }}
+          key: bazel-${{ matrix.target.name }}-${{ github.ref }}
           restore-keys:
-            bazel-${{ runner.os }}-master
+            bazel-${{ matrix.target.name }}-refs/heads/master
       - name: Build & Test
         run: |
           INVOCATION_ID="$(uuidgen)"
