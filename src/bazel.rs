@@ -912,7 +912,10 @@ mod tests {
 
     use lsp_types::CompletionItemKind;
     use serde_json::json;
-    use starlark::docs::DocModule;
+    use starlark::{
+        docs::{DocMember, DocModule, DocParam, DocReturn, DocString},
+        typing::Ty,
+    };
     use starlark_lsp::{
         completion::{StringCompletionResult, StringCompletionType},
         server::{LspContext, LspUrl},
@@ -1199,6 +1202,70 @@ mod tests {
 
         assert!(module_contains(&module, "glob"));
         assert!(module_contains(&module, "range"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_environment_function_arguments() -> anyhow::Result<()> {
+        let fixture = TestFixture::new("simple")?;
+        let context = fixture.context()?;
+
+        let module = context.get_environment(&LspUrl::File(PathBuf::from("/foo/bar/BUILD")));
+
+        let (_, glob_member) = module
+            .members
+            .iter()
+            .find(|(member, _)| *member == "glob")
+            .unwrap();
+
+        let f = match glob_member {
+            DocMember::Function(f) => f,
+            _ => panic!(),
+        };
+
+        assert_eq!(
+            *f.params,
+            vec![
+                DocParam::Arg {
+                    name: "include".into(),
+                    default_value: Some("[]".into()),
+                    docs: Some(DocString {
+                        summary: "The list of glob patterns to include.".into(),
+                        details: None,
+                    }),
+                    typ: Ty::any(),
+                },
+                DocParam::Arg {
+                    name: "exclude".into(),
+                    default_value: Some("[]".into()),
+                    docs: Some(DocString {
+                        summary: "The list of glob patterns to exclude.".into(),
+                        details: None,
+                    }),
+                    typ: Ty::any(),
+                },
+                DocParam::Arg {
+                    name: "exclude_directories".into(),
+                    default_value: Some("1".into()),
+                    docs: Some(DocString {
+                        summary: "A flag whether to exclude directories or not.".into(),
+                        details: None,
+                    }),
+                    typ: Ty::any(),
+                },
+                DocParam::Arg {
+                    name: "allow_empty".into(),
+                    // TODO: Fix this
+                    default_value: Some("unbound".into()),
+                    docs: Some(DocString {
+                        summary: "Whether we allow glob patterns to match nothing. If `allow_empty` is False, each individual include pattern must match something and also the final result must be non-empty (after the matches of the `exclude` patterns are excluded).".into(),
+                        details: None,
+                    }),
+                    typ: Ty::any(),
+                },
+            ]
+        );
 
         Ok(())
     }
