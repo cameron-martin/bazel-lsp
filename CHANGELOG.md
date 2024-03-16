@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/cameron-martin/bazel-lsp/compare/v0.4.1...v0.5.0) (2024-03-05)
+
+
+### Features
+
+* Add environment function parameter info ([08a05c1](https://github.com/cameron-martin/bazel-lsp/commit/08a05c1078af76db6007a241cf67ebe52c592d09))
+
 ## [0.4.1](https://github.com/cameron-martin/bazel-lsp/compare/v0.4.0...v0.4.1) (2024-02-25)
 
 
