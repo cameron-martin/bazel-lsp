@@ -16,9 +16,9 @@ jobs:
           - name: linux-amd64
             runs-on: ubuntu-20.04
             extension: ""
-          # - name: windows-amd64
-          #   runs-on: windows-2019
-          #   extension: .exe
+          - name: windows-amd64
+            runs-on: windows-2019
+            extension: .exe
           - name: osx-amd64
             runs-on: macos-11
             extension: ""
@@ -35,6 +35,7 @@ jobs:
         run: |
           echo "build:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> ~/.bazelrc
           echo "startup --output_base=$RUNNER_TEMP/.bazel/output_base" >> ~/.bazelrc
+        shell: bash
       - uses: actions/cache@v4
         with:
           path: |
@@ -42,14 +43,20 @@ jobs:
           key: bazel-${{ matrix.target.name }}-${{ github.ref }}
           restore-keys:
             bazel-${{ matrix.target.name }}-refs/heads/master
-      - name: Build & Test
+      - name: Build & Test (bash)
         run: |
           INVOCATION_ID="$(uuidgen)"
           echo "[View on BuildBuddy](https://bazel-lsp.buildbuddy.io/invocation/$INVOCATION_ID)" >> $GITHUB_STEP_SUMMARY
           bazel test //... -c opt --config=ci --invocation_id="$INVOCATION_ID"
+        if: runner.os != 'Windows'
+      - name: Build & Test (powershell)
+        run: |
+          $InvocationId = New-Guid
+          bazel --output_base=C:/b test //... -c opt --config=ci --invocation_id="$InvocationId"
+        if: runner.os == 'Windows'
       - uses: actions/upload-artifact@v4
         with:
-          name: bazel-lsp-${{ matrix.target.name }}${{ matrix.target.extension }}
+          name: bazel-lsp-${{ matrix.target.name }}
           path: bazel-bin/bazel-lsp${{ matrix.target.extension }}
   release:
     name: Release
