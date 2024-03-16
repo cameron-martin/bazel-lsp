@@ -3,8 +3,12 @@ load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_test")
 rust_binary(
     name = "bazel-lsp",
     srcs = glob(["src/**/*.rs"]),
-    compile_data = ["//src/builtin:builtin.pb"],
+    compile_data = [
+        "//src/builtin:builtin.pb",
+        "//src/builtin:default_build_language.pb",
+    ],
     deps = [
+        "//src/builtin:build_proto_rust",
         "//src/builtin:builtin_proto_rust",
         "@crates//:anyhow",
         "@crates//:clap",

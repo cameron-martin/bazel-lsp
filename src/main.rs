@@ -2,10 +2,11 @@ mod bazel;
 mod builtin;
 mod client;
 mod eval;
+mod file_type;
 mod label;
-mod workspace;
 #[cfg(test)]
 pub mod test_fixture;
+mod workspace;
 
 use std::{env, path::PathBuf};
 
@@ -22,7 +23,7 @@ struct Args {
     bazel: PathBuf,
 
     /// Whether to use a separate output base for bazel queries.
-    /// 
+    ///
     /// This makes concurrent builds not block queries.
     #[arg(long)]
     no_distinct_output_base: bool,
@@ -42,7 +43,10 @@ fn main() -> anyhow::Result<()> {
     let query_output_base = if args.no_distinct_output_base {
         None
     } else {
-        Some(args.query_output_base.unwrap_or_else(|| env::temp_dir().join("bazel-lsp")))
+        Some(
+            args.query_output_base
+                .unwrap_or_else(|| env::temp_dir().join("bazel-lsp")),
+        )
     };
 
     let ctx = BazelContext::new(
@@ -51,7 +55,7 @@ fn main() -> anyhow::Result<()> {
         true,
         &[],
         true,
-        query_output_base
+        query_output_base,
     )?;
 
     starlark_lsp::server::stdio_server(ctx)?;

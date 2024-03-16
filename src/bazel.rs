@@ -30,6 +30,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 
+use anyhow::anyhow;
 use either::Either;
 use lsp_types::CompletionItemKind;
 use lsp_types::Url;
@@ -61,6 +62,7 @@ use crate::eval::dialect;
 use crate::eval::globals;
 use crate::eval::ContextMode;
 use crate::eval::EvalResult;
+use crate::file_type::FileType;
 use crate::label::Label;
 use crate::workspace::BazelWorkspace;
 
@@ -147,9 +149,6 @@ pub(crate) struct BazelContext<Client> {
 }
 
 impl<Client: BazelClient> BazelContext<Client> {
-    const BUILD_FILE_NAMES: [&'static str; 2] = ["BUILD", "BUILD.bazel"];
-    const LOADABLE_EXTENSIONS: [&'static str; 1] = ["bzl"];
-
     pub(crate) fn new(
         client: Client,
         mode: ContextMode,
@@ -497,6 +496,8 @@ impl<Client: BazelClient> BazelContext<Client> {
         for entry in fs::read_dir(from_path)? {
             let entry = entry?;
             let path = entry.path();
+            let file_type = FileType::from_path(&path);
+
             // NOTE: Safe to `unwrap()` here, because we know that `path` is a file system path. And
             // since it's an entry in a directory, it must have a file name.
             let file_name = path.file_name().unwrap().to_string_lossy();
@@ -516,7 +517,7 @@ impl<Client: BazelClient> BazelContext<Client> {
                     kind: CompletionItemKind::FOLDER,
                 });
             } else if path.is_file() {
-                if Self::BUILD_FILE_NAMES.contains(&file_name.as_ref()) {
+                if file_type == FileType::Build {
                     if options.targets {
                         if let Some(targets) = self.query_buildable_targets(
                             &format!(
@@ -544,16 +545,8 @@ impl<Client: BazelClient> BazelContext<Client> {
                     // Check if it's in the list of allowed extensions. If we have a list, and it
                     // doesn't contain the extension, or the file has no extension, skip this file.
                     if options.files == FilesystemFileCompletionOptions::OnlyLoadable {
-                        let extension = path.extension().map(|ext| ext.to_string_lossy());
-                        match extension {
-                            Some(extension) => {
-                                if !Self::LOADABLE_EXTENSIONS.contains(&extension.as_ref()) {
-                                    continue;
-                                }
-                            }
-                            None => {
-                                continue;
-                            }
+                        if file_type != FileType::Library {
+                            continue;
                         }
                     }
 
@@ -594,6 +587,38 @@ impl<Client: BazelClient> BazelContext<Client> {
                 .collect(),
         )
     }
+
+    fn get_build_language_proto(&self, uri: &LspUrl) -> anyhow::Result<Vec<u8>> {
+        let workspace = self
+            .workspace::<PathBuf>(None, uri)?
+            .ok_or_else(|| anyhow!("Cannot find workspace"))?;
+
+        self.client.build_language(&workspace)
+    }
+
+    fn try_get_environment(&self, uri: &LspUrl) -> anyhow::Result<DocModule> {
+        let file_type = FileType::from_lsp_url(uri);
+
+        let language_proto = self.get_build_language_proto(uri);
+
+        let language_proto = language_proto
+            .as_deref()
+            .unwrap_or(include_bytes!("builtin/default_build_language.pb"));
+
+        let language = builtin::BuildLanguage::decode(&language_proto[..]).unwrap();
+
+        let builtins_proto = include_bytes!("builtin/builtin.pb");
+        let builtins = builtin::Builtins::decode(&builtins_proto[..]).unwrap();
+
+        let members: SmallMap<_, _> = builtin::build_language_to_doc_members(&language)
+            .chain(builtin::builtins_to_doc_members(&builtins, file_type))
+            .collect();
+
+        Ok(DocModule {
+            docs: None,
+            members,
+        })
+    }
 }
 
 impl<Client: BazelClient> LspContext for BazelContext<Client> {
@@ -630,7 +655,7 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
 
         // If the presumed filename doesn't exist, try to find a build file from the build system
         // and use that instead.
-        for build_file_name in Self::BUILD_FILE_NAMES {
+        for build_file_name in FileType::BUILD_FILE_NAMES {
             let path = folder.join(build_file_name);
             if path.exists() {
                 return Ok(Url::from_file_path(path).unwrap().try_into()?);
@@ -747,44 +772,7 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
     }
 
     fn get_environment(&self, uri: &LspUrl) -> DocModule {
-        let mut is_build_file = false;
-        let mut is_bzl_file = false;
-
-        if let LspUrl::File(path) = uri {
-            if let Some(extension) = path.extension() {
-                if extension == "bzl" {
-                    is_bzl_file = true;
-                }
-            }
-
-            if let Some(file_name) = path.file_name() {
-                if Self::BUILD_FILE_NAMES.iter().any(|name| *name == file_name) {
-                    is_build_file = true;
-                }
-            }
-        }
-
-        let proto = include_bytes!("builtin/builtin.pb");
-        let builtins = builtin::Builtins::decode(&proto[..]).unwrap();
-        let members: SmallMap<_, _> = builtins
-            .global
-            .iter()
-            .flat_map(|global| {
-                if global.api_context == builtin::ApiContext::All as i32
-                    || (global.api_context == builtin::ApiContext::Bzl as i32 && is_bzl_file)
-                    || (global.api_context == builtin::ApiContext::Build as i32 && is_build_file)
-                {
-                    Some((global.name.clone(), builtin::value_to_doc_member(global)))
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        DocModule {
-            docs: None,
-            members,
-        }
+        self.try_get_environment(uri).unwrap_or_default()
     }
 
     fn get_url_for_global_symbol(
@@ -1185,7 +1173,7 @@ mod tests {
     }
 
     #[test]
-    fn test_environment_contents_based_on_filename() -> anyhow::Result<()> {
+    fn test_environment_builtins() -> anyhow::Result<()> {
         let fixture = TestFixture::new("simple")?;
         let context = fixture.context()?;
 
@@ -1202,6 +1190,26 @@ mod tests {
 
         assert!(module_contains(&module, "glob"));
         assert!(module_contains(&module, "range"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_environment_rules() -> anyhow::Result<()> {
+        let fixture = TestFixture::new("simple")?;
+        let context = fixture.context()?;
+
+        fn module_contains(module: &DocModule, value: &str) -> bool {
+            module.members.iter().any(|(member, _)| member == value)
+        }
+
+        // let module = context.get_environment(&LspUrl::File(PathBuf::from("/foo/bar.bzl")));
+
+        // assert!(module_contains(&module, "cc_library"));
+
+        let module = context.get_environment(&LspUrl::File(PathBuf::from("/foo/bar/BUILD")));
+
+        assert!(module_contains(&module, "cc_library"));
 
         Ok(())
     }

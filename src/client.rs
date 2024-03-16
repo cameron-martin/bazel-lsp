@@ -27,6 +27,7 @@ pub(crate) trait BazelClient {
         repo: &str,
     ) -> anyhow::Result<HashMap<String, String>>;
     fn query(&self, workspace: &BazelWorkspace, query: &str) -> anyhow::Result<String>;
+    fn build_language(&self, workspace: &BazelWorkspace) -> anyhow::Result<Vec<u8>>;
 }
 
 pub(crate) struct BazelCli {
@@ -118,6 +119,24 @@ impl BazelClient for BazelCli {
 
         Ok(String::from_utf8(output.stdout)?)
     }
+
+    fn build_language(&self, workspace: &BazelWorkspace) -> anyhow::Result<Vec<u8>> {
+        let mut command = &mut Command::new(&self.bazel);
+        if let Some(output_base) = &workspace.query_output_base {
+            command = command.arg("--output_base").arg(output_base);
+        }
+        command = command.arg("info").arg("build-language");
+        command = command.current_dir(&workspace.root);
+        let output = command.output()?;
+
+        if !output.status.success() {
+            return Err(anyhow::anyhow!(
+                "Command `bazel info build-language` failed"
+            ));
+        }
+
+        Ok(output.stdout)
+    }
 }
 
 #[derive(Default)]
@@ -125,6 +144,7 @@ pub struct Profile {
     pub info: u16,
     pub dump_repo_mapping: u16,
     pub query: u16,
+    pub build_language: u16,
 }
 
 /// A wrapper client that records the number of invocations to the inner client.
@@ -165,6 +185,12 @@ impl<InnerClient: BazelClient> BazelClient for ProfilingClient<InnerClient> {
 
         self.inner.query(workspace, query)
     }
+
+    fn build_language(&self, workspace: &BazelWorkspace) -> anyhow::Result<Vec<u8>> {
+        self.profile.borrow_mut().build_language += 1;
+
+        self.inner.build_language(workspace)
+    }
 }
 
 #[cfg(test)]
@@ -197,5 +223,9 @@ impl BazelClient for MockBazel {
             .get(query)
             .map(|result| result.clone())
             .ok_or_else(|| anyhow!("Query {} not registered in mock", query))
+    }
+
+    fn build_language(&self, _workspace: &BazelWorkspace) -> anyhow::Result<Vec<u8>> {
+        Err(anyhow!("Cannot get test build language"))
     }
 }
