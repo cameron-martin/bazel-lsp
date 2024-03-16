@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/cameron-martin/bazel-lsp/compare/v0.5.0...v0.6.0) (2024-03-16)
+
+
+### Features
+
+* Add builtin rules to autocomplete ([#33](https://github.com/cameron-martin/bazel-lsp/issues/33)) ([a67cd49](https://github.com/cameron-martin/bazel-lsp/commit/a67cd4916b7fa6b9b2813e9786e09eceebfa3d8f))
+
 ## [0.5.0](https://github.com/cameron-martin/bazel-lsp/compare/v0.4.1...v0.5.0) (2024-03-05)
 
 
