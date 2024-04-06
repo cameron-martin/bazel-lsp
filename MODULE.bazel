@@ -1,4 +1,5 @@
-bazel_dep(name = "rules_rust", version = "0.40.0")
+bazel_dep(name = "rules_rust", version = "0.41.0")
+git_override(module_name = "rules_rust", remote = "https://github.com/bazelbuild/rules_rust.git", commit = "1a053cfbf9a28ef09a5594bf69a9360c8e59bc61")
 
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 rust.toolchain(
