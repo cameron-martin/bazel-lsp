@@ -1,6 +1,6 @@
 # Bazel LSP
 
-This is a LSP for bazel, forked from [starlark-rust](https://github.com/facebookexperimental/starlark-rust).
+This is a LSP for bazel, based on [starlark-rust](https://github.com/facebookexperimental/starlark-rust).
 
 ## Features
 
