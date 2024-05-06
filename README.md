@@ -26,9 +26,7 @@ Ensure you have the [Bazel extension](https://marketplace.visualstudio.com/items
 
 ```json
 {
-  "bazel.lsp.enabled": true,
-  "bazel.lsp.command": "bazel-lsp",
-  "bazel.lsp.args": []
+  "bazel.lsp.command": "bazel-lsp"
 }
 ```
 
