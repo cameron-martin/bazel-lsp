@@ -34,7 +34,7 @@ jobs:
           BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
         run: |
           echo "build:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> ~/.bazelrc
-          echo "startup --output_base=$RUNNER_TEMP/.bazel/output_base" >> ~/.bazelrc
+          echo "startup --output_base=${RUNNER_TEMP//\\//}/.bazel/output_base" >> ~/.bazelrc
         shell: bash
       - uses: actions/cache@v4
         with:
