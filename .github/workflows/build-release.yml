@@ -29,17 +29,31 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - name: Set up bazelrc
+      - name: Set up buildbuddy
         env:
           BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
         run: |
           echo "build:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> ~/.bazelrc
-          echo "startup --output_base=${RUNNER_TEMP//\\//}/.bazel/output_base" >> ~/.bazelrc
         shell: bash
+      - name: Set up output base
+        id: setup-output-base
+        run: |
+          OUTPUT_BASE=$RUNNER_TEMP/.bazel/output_base
+          echo "startup --output_base=$OUTPUT_BASE" >> ~/.bazelrc
+          echo "OUTPUT_BASE=$OUTPUT_BASE" >> "$GITHUB_ENV"
+        shell: bash
+        if: runner.os != 'Windows'
+      - name: Set up output base
+        run: |
+          OUTPUT_BASE=C:/b
+          echo "startup --output_base=$OUTPUT_BASE" >> ~/.bazelrc
+          echo "OUTPUT_BASE=$OUTPUT_BASE" >> "$GITHUB_ENV"
+        shell: bash
+        if: runner.os == 'Windows'
       - uses: actions/cache@v4
         with:
           path: |
-            ${{ runner.temp }}/.bazel/output_base/external
+            ${{ github.env.OUTPUT_BASE }}/external
           key: bazel-${{ matrix.target.name }}-${{ github.ref }}
           restore-keys:
             bazel-${{ matrix.target.name }}-refs/heads/master
@@ -52,7 +66,7 @@ jobs:
       - name: Build & Test (powershell)
         run: |
           $InvocationId = New-Guid
-          bazel --output_base=C:/b test //... -c opt --config=ci --invocation_id="$InvocationId"
+          bazel test //... -c opt --config=ci --invocation_id="$InvocationId"
         if: runner.os == 'Windows'
       - uses: actions/upload-artifact@v4
         with:
