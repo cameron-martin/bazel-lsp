@@ -36,7 +36,6 @@ jobs:
           echo "build:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> ~/.bazelrc
         shell: bash
       - name: Set up output base
-        id: setup-output-base
         run: |
           OUTPUT_BASE=$RUNNER_TEMP/.bazel/output_base
           echo "startup --output_base=$OUTPUT_BASE" >> ~/.bazelrc
@@ -53,7 +52,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: |
-            ${{ github.env.OUTPUT_BASE }}/external
+            ${{ env.OUTPUT_BASE }}/external
           key: bazel-${{ matrix.target.name }}-${{ github.ref }}
           restore-keys:
             bazel-${{ matrix.target.name }}-refs/heads/master
