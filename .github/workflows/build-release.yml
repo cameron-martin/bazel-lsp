@@ -20,7 +20,7 @@ jobs:
           #   runs-on: windows-2019
           #   extension: .exe
           - name: osx-amd64
-            runs-on: macos-11
+            runs-on: macos-12
             extension: ""
           - name: osx-arm64
             runs-on: macos-14
