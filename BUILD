@@ -7,6 +7,7 @@ rust_binary(
         "//src/builtin:builtin.pb",
         "//src/builtin:default_build_language.pb",
     ],
+    rustc_env_files = [":generate_rustc_env_file"],
     deps = [
         "//src/builtin:build_proto_rust",
         "//src/builtin:builtin_proto_rust",
@@ -21,6 +22,17 @@ rust_binary(
         "@crates//:starlark_lsp",
         "@crates//:thiserror",
     ],
+)
+
+genrule(
+    name = "generate_rustc_env_file",
+    srcs = [
+        "Cargo.toml",
+        "src/main.rs",
+    ],
+    outs = ["rustc_env_file"],
+    cmd = "echo \"CARGO_PKG_VERSION=$$($(location @rust_host_tools//:cargo) read-manifest | jq -r .version)\" > $@",
+    tools = ["@rust_host_tools//:cargo"],
 )
 
 rust_test(
