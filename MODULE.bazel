@@ -1,12 +1,5 @@
 bazel_dep(name = "rules_rust", version = "0.46.0")
 
-archive_override(
-    module_name = "rules_rust",
-    urls = ["https://github.com/bazelbuild/rules_rust/archive/e3f6258b1e1660652ae044f01c6dac074f9fb206.tar.gz"],
-    strip_prefix = "rules_rust-e3f6258b1e1660652ae044f01c6dac074f9fb206",
-    integrity = "sha256-c1DP/HTQSBXz9GL134NL6Bw7JNulPQVnP6UbTn3BG/4="
-)
-
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 rust.toolchain(
     edition = "2021",
