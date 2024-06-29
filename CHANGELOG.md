@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/cameron-martin/bazel-lsp/compare/v0.6.0...v0.6.1) (2024-06-29)
+
+
+### Bug Fixes
+
+* Don't give empty documentation to starlark-rust ([#44](https://github.com/cameron-martin/bazel-lsp/issues/44)) ([355ceed](https://github.com/cameron-martin/bazel-lsp/commit/355ceed5bfbd0342573364c36ae539cdb3fbe128)), closes [#41](https://github.com/cameron-martin/bazel-lsp/issues/41)
+
 ## [0.6.0](https://github.com/cameron-martin/bazel-lsp/compare/v0.5.0...v0.6.0) (2024-03-16)
 
 
