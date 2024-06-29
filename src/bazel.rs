@@ -1277,4 +1277,37 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    /// Empty summary in DocString strings break starlark-rust. See #41. Here
+    /// we ensure that instead of generating an empty summary, the whole
+    /// DocString is None.
+    fn no_empty_documentation_is_produced() -> anyhow::Result<()> {
+        let fixture = TestFixture::new("simple")?;
+        let context = fixture.context()?;
+
+        let module = context.get_environment(&LspUrl::File(PathBuf::from("/foo/bar/defs.bzl")));
+
+        fn check_doc_not_empty(doc: Option<&DocString>) {
+            if let Some(doc) = doc {
+                assert!(!doc.summary.trim().is_empty());
+            }
+        }
+
+        for (name, member) in module.members {
+            match member {
+                DocMember::Function(function) => {
+                    check_doc_not_empty(function.docs.as_ref());
+                    for param in function.params {
+                        check_doc_not_empty(param.get_doc_string());
+                    }
+                }
+                DocMember::Property(property) => {
+                    check_doc_not_empty(property.docs.as_ref());
+                }
+            }
+        }
+
+        Ok(())
+    }
 }

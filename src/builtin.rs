@@ -18,19 +18,19 @@ pub fn build_language_to_doc_members<'a>(
 
 pub fn rule_to_doc_member(rule: &RuleDefinition) -> DocMember {
     DocMember::Function(DocFunction {
-        docs: rule.documentation.as_ref().map(|doc| DocString {
-            summary: doc.clone(),
-            details: None,
-        }),
+        docs: rule
+            .documentation
+            .as_ref()
+            .and_then(|doc| create_docstring(doc)),
         params: rule
             .attribute
             .iter()
             .map(|attribute| DocParam::Arg {
                 name: attribute.name.clone(),
-                docs: attribute.documentation.as_ref().map(|doc| DocString {
-                    summary: doc.clone(),
-                    details: None,
-                }),
+                docs: attribute
+                    .documentation
+                    .as_ref()
+                    .and_then(|doc| create_docstring(doc)),
                 typ: Ty::any(),
                 default_value: None,
             })
@@ -55,11 +55,8 @@ pub fn builtins_to_doc_members<'a>(
     })
 }
 
-pub fn value_to_doc_member(value: &Value) -> DocMember {
-    let docs = Some(DocString {
-        summary: value.doc.clone(),
-        details: None,
-    });
+fn value_to_doc_member(value: &Value) -> DocMember {
+    let docs = create_docstring(&value.doc);
 
     if let Some(callable) = &value.callable {
         DocMember::Function(DocFunction {
@@ -69,10 +66,7 @@ pub fn value_to_doc_member(value: &Value) -> DocMember {
                 .iter()
                 .map(|param| DocParam::Arg {
                     name: param.name.clone(),
-                    docs: Some(DocString {
-                        summary: param.doc.clone(),
-                        details: None,
-                    }),
+                    docs: create_docstring(&param.doc),
                     typ: Ty::any(),
                     default_value: if param.is_mandatory {
                         None
@@ -87,6 +81,19 @@ pub fn value_to_doc_member(value: &Value) -> DocMember {
         DocMember::Property(DocProperty {
             docs,
             typ: Ty::any(),
+        })
+    }
+}
+
+fn create_docstring(summary: &str) -> Option<DocString> {
+    let summary = summary.trim();
+
+    if summary.is_empty() {
+        None
+    } else {
+        Some(DocString {
+            summary: summary.to_string(),
+            details: None,
         })
     }
 }
