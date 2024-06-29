@@ -1,4 +1,4 @@
-bazel_dep(name = "rules_rust", version = "0.40.0")
+bazel_dep(name = "rules_rust", version = "0.42.1")
 
 archive_override(
     module_name = "rules_rust",
@@ -10,10 +10,14 @@ archive_override(
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 rust.toolchain(
     edition = "2021",
-    versions = ["1.75.0"],
+    versions = ["1.77.2"],
 )
 use_repo(rust, "rust_toolchains")
 register_toolchains("@rust_toolchains//:all")
+
+rust_host_tools = use_extension("@rules_rust//rust:extensions.bzl", "rust_host_tools")
+
+use_repo(rust_host_tools, "rust_host_tools")
 
 crate = use_extension(
     "@rules_rust//crate_universe:extension.bzl",
