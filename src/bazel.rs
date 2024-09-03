@@ -223,10 +223,10 @@ impl<Client: BazelClient> BazelContext<Client> {
     fn url_for_doc(doc: &Doc) -> LspUrl {
         let url = match &doc.item {
             DocItem::Module(_) => Url::parse("starlark:/native/builtins.bzl").unwrap(),
-            DocItem::Object(_) => {
+            DocItem::Type(_) => {
                 Url::parse(&format!("starlark:/native/builtins/{}.bzl", doc.id.name)).unwrap()
             }
-            DocItem::Function(_) | DocItem::Property(_) => {
+            DocItem::Member(_) => {
                 Url::parse("starlark:/native/builtins.bzl").unwrap()
             }
         };
@@ -612,6 +612,7 @@ impl<Client: BazelClient> BazelContext<Client> {
 
         let members: SmallMap<_, _> = builtin::build_language_to_doc_members(&language)
             .chain(builtin::builtins_to_doc_members(&builtins, file_type))
+            .map(|(name, member)| (name, DocItem::Member(member)))
             .collect();
 
         Ok(DocModule {
