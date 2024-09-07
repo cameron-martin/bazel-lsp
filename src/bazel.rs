@@ -226,9 +226,7 @@ impl<Client: BazelClient> BazelContext<Client> {
             DocItem::Type(_) => {
                 Url::parse(&format!("starlark:/native/builtins/{}.bzl", doc.id.name)).unwrap()
             }
-            DocItem::Member(_) => {
-                Url::parse("starlark:/native/builtins.bzl").unwrap()
-            }
+            DocItem::Member(_) => Url::parse("starlark:/native/builtins.bzl").unwrap(),
         };
         LspUrl::try_from(url).unwrap()
     }
