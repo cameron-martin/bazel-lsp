@@ -15,30 +15,18 @@
  * limitations under the License.
  */
 
-use starlark::environment::Globals;
 use starlark::errors::EvalMessage;
 use starlark::syntax::AstModule;
 use starlark::syntax::Dialect;
 
-#[derive(Debug)]
-pub(crate) enum ContextMode {
-    Check,
-    Run,
-}
-
-/// The outcome of evaluating (checking, parsing or running) given starlark code.
+/// The outcome of evaluating (checking or parsing) given starlark code.
 pub(crate) struct EvalResult<T: Iterator<Item = EvalMessage>> {
     /// The diagnostic and error messages from evaluating a given piece of starlark code.
     pub messages: T,
-    /// If the code is only parsed, not run, and there were no errors, this will contain
-    /// the parsed module. Otherwise, it will be `None`
+    /// If there were no errors, this will contain the parsed module. Otherwise, it will be `None`
     pub ast: Option<AstModule>,
 }
 
-
-pub(crate) fn globals() -> Globals {
-    Globals::extended_internal()
-}
 
 pub(crate) fn dialect() -> Dialect {
     Dialect::Extended

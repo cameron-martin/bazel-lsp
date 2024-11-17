@@ -9,7 +9,6 @@ use anyhow::anyhow;
 use crate::{
     bazel::BazelContext,
     client::{BazelInfo, MockBazel, ProfilingClient},
-    eval::ContextMode,
 };
 
 pub struct TestFixture {
@@ -59,20 +58,12 @@ impl TestFixture {
                 queries: HashMap::new(),
                 repo_mappings: HashMap::new(),
             },
-            mode: ContextMode::Check,
-            print_non_none: true,
-            prelude: Vec::new(),
-            module: true,
         })
     }
 }
 
 pub(crate) struct ContextBuilder {
     client: MockBazel,
-    mode: ContextMode,
-    print_non_none: bool,
-    prelude: Vec<PathBuf>,
-    module: bool,
 }
 
 impl ContextBuilder {
@@ -97,10 +88,6 @@ impl ContextBuilder {
     pub(crate) fn build(self) -> anyhow::Result<BazelContext<ProfilingClient<MockBazel>>> {
         BazelContext::new(
             ProfilingClient::new(self.client),
-            self.mode,
-            self.print_non_none,
-            &self.prelude,
-            self.module,
             None,
         )
     }
