@@ -7,6 +7,49 @@ use starlark::{
 
 use crate::file_type::FileType;
 
+/// Names of globals missing in builtins reported by bazel.
+/// See e.g. https://github.com/bazel-contrib/vscode-bazel/issues/1#issuecomment-2036369868
+pub static MISSING_GLOBALS: &'static[&'static str] = &[
+    // All values from https://bazel.build/rules/lib/globals/workspace
+    "bind",
+    "register_execution_platforms",
+    "register_toolchains",
+    "workspace",
+
+    // Values from https://bazel.build/rules/lib/globals/module
+    "archive_override",
+    "bazel_dep",
+    "git_override",
+    "include",
+    "inject_repo",
+    "local_path_override",
+    "module",
+    "multiple_version_override",
+    "override_repo",
+    "register_execution_platforms",
+    "register_toolchains",
+    "single_version_override",
+    "use_extension",
+    "use_repo",
+    "use_repo_rule",
+
+    // Missing values from https://bazel.build/rules/lib/globals/build
+    "package",
+    "repo_name",
+
+    // Missing values from https://bazel.build/rules/lib/globals/bzl
+    "exec_transition",
+    "module_extension",
+    "repository_rule",
+    "tag_class",
+
+    // Marked as not documented on https://github.com/bazelbuild/bazel/blob/master/src/main/java/com/google/devtools/build/lib/packages/BuildGlobals.java
+    "licenses",
+    "environment_group",
+    // Removed in https://github.com/bazelbuild/bazel/commit/5ade9da5de25bc93d0ec79faea8f08a54e5b9a68
+    "distribs",
+];
+
 pub fn build_language_to_doc_members<'a>(
     build_language: &'a BuildLanguage,
 ) -> impl Iterator<Item = (String, DocMember)> + 'a {

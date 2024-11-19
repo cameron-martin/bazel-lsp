@@ -16,5 +16,7 @@ exports_files([
     # Built from the bazel repo using:
     # `bazel build //src/main/java/com/google/devtools/build/lib:gen_api_proto`
     "builtin.pb",
+    # Obtained from bazel instance with:
+    # `bazel info build-language`
     "default_build_language.pb",
 ])
