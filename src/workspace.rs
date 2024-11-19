@@ -1,7 +1,6 @@
 use std::{
     borrow::Cow,
     io,
-    os::unix::ffi::OsStrExt,
     path::{Path, PathBuf},
 };
 
@@ -42,8 +41,10 @@ impl BazelWorkspace {
                 }),
             external_output_base: PathBuf::from(info.output_base).join("external"),
             query_output_base: if let Some(output_base) = query_output_base {
-                let hash =
-                    digest::digest(&digest::SHA256, output_base.as_ref().as_os_str().as_bytes());
+                let hash = digest::digest(
+                    &digest::SHA256,
+                    output_base.as_ref().as_os_str().as_encoded_bytes(),
+                );
                 let hash_hex = hex::encode(&hash);
                 Some(output_base.as_ref().join(hash_hex))
             } else {
