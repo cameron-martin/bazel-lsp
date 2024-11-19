@@ -51,7 +51,7 @@ dependencies = [
 [[package]]
 name = "allocative"
 version = "0.3.3"
-source = "git+https://github.com/facebookexperimental/starlark-rust.git?branch=main#293532ec1a4d1da232b4fe6b7f62ef174b7106fa"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#abaceca2b5b43c7cc3152182d7673e64130cde36"
 dependencies = [
  "allocative_derive",
  "bumpalo",
@@ -63,7 +63,7 @@ dependencies = [
 [[package]]
 name = "allocative_derive"
 version = "0.3.3"
-source = "git+https://github.com/facebookexperimental/starlark-rust.git?branch=main#293532ec1a4d1da232b4fe6b7f62ef174b7106fa"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#abaceca2b5b43c7cc3152182d7673e64130cde36"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -340,6 +340,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "cfg_aliases"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd16c4719339c4530435d38e511904438d07cce7950afa3718a84ac36c10e89e"
+
+[[package]]
 name = "clap"
 version = "4.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -381,19 +387,17 @@ checksum = "98cc8fbded0c607b7ba9dd60cd98df59af97e84d24e49c8557331cfc26d301ce"
 
 [[package]]
 name = "clipboard-win"
-version = "4.5.0"
+version = "5.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7191c27c2357d9b7ef96baac1773290d4ca63b24205b82a3fd8a0637afcf0362"
+checksum = "15efe7a882b08f34e38556b14f2fb3daa98769d06c7f0c1b076dfd0d983bc892"
 dependencies = [
  "error-code",
- "str-buf",
- "winapi",
 ]
 
 [[package]]
 name = "cmp_any"
 version = "0.8.1"
-source = "git+https://github.com/facebookexperimental/starlark-rust.git?branch=main#293532ec1a4d1da232b4fe6b7f62ef174b7106fa"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#abaceca2b5b43c7cc3152182d7673e64130cde36"
 
 [[package]]
 name = "colorchoice"
@@ -403,9 +407,12 @@ checksum = "acbf1af155f9b9ef647e42cdc158db4b64a1b61f743629225fde6f3e0be2a7c7"
 
 [[package]]
 name = "convert_case"
-version = "0.4.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
+checksum = "ec182b0ca2f35d8fc196cf3404988fd8b8c739a4d270ff118a398feb0cbec1ca"
+dependencies = [
+ "unicode-segmentation",
+]
 
 [[package]]
 name = "crossbeam-channel"
@@ -462,15 +469,24 @@ dependencies = [
 
 [[package]]
 name = "derive_more"
-version = "0.99.17"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fb810d30a7c1953f91334de7244731fc3f3c10d7fe163338a35b9f640960321"
+checksum = "4a9b99b9cbbe49445b21764dc0625032a89b145a2642e67603e1c936f5458d05"
+dependencies = [
+ "derive_more-impl",
+]
+
+[[package]]
+name = "derive_more-impl"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb7330aeadfbe296029522e6c40f315320aba36fc43a5b3632f3795348f3bd22"
 dependencies = [
  "convert_case",
  "proc-macro2",
  "quote",
- "rustc_version",
- "syn 1.0.109",
+ "syn 2.0.59",
+ "unicode-xid",
 ]
 
 [[package]]
@@ -503,7 +519,7 @@ dependencies = [
 [[package]]
 name = "display_container"
 version = "0.9.0"
-source = "git+https://github.com/facebookexperimental/starlark-rust.git?branch=main#293532ec1a4d1da232b4fe6b7f62ef174b7106fa"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#abaceca2b5b43c7cc3152182d7673e64130cde36"
 dependencies = [
  "either",
  "indenter",
@@ -512,7 +528,7 @@ dependencies = [
 [[package]]
 name = "dupe"
 version = "0.9.0"
-source = "git+https://github.com/facebookexperimental/starlark-rust.git?branch=main#293532ec1a4d1da232b4fe6b7f62ef174b7106fa"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#abaceca2b5b43c7cc3152182d7673e64130cde36"
 dependencies = [
  "dupe_derive",
 ]
@@ -520,7 +536,7 @@ dependencies = [
 [[package]]
 name = "dupe_derive"
 version = "0.9.0"
-source = "git+https://github.com/facebookexperimental/starlark-rust.git?branch=main#293532ec1a4d1da232b4fe6b7f62ef174b7106fa"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#abaceca2b5b43c7cc3152182d7673e64130cde36"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -575,13 +591,9 @@ dependencies = [
 
 [[package]]
 name = "error-code"
-version = "2.3.1"
+version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64f18991e7bf11e7ffee451b5318b5c1a73c52d0d0ada6e5a3017c8c1ced6a21"
-dependencies = [
- "libc",
- "str-buf",
-]
+checksum = "a0474425d51df81997e2f90a21591180b38eccf27292d755f3e30750225c175b"
 
 [[package]]
 name = "fastrand"
@@ -591,13 +603,13 @@ checksum = "658bd65b1cf4c852a3cc96f18a8ce7b5640f6b703f905c7d74532294c2a63984"
 
 [[package]]
 name = "fd-lock"
-version = "3.0.13"
+version = "4.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef033ed5e9bad94e55838ca0ca906db0e043f517adda0c8b79c7a8c66c93c1b5"
+checksum = "7e5768da2206272c81ef0b5e951a41862938a6070da63bcea197899942d3b947"
 dependencies = [
  "cfg-if",
  "rustix",
- "windows-sys 0.48.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1100,12 +1112,13 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.26.4"
+version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "598beaf3cc6fdd9a5dfb1630c2800c7acd31df7aaf0f565796fba2b53ca1af1b"
+checksum = "ab2156c4fce2f8df6c499cc1c763e4394b7482525bf2a9701c9d79d215f519e4"
 dependencies = [
- "bitflags 1.3.2",
+ "bitflags 2.5.0",
  "cfg-if",
+ "cfg_aliases",
  "libc",
 ]
 
@@ -1542,15 +1555,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d626bb9dae77e28219937af045c257c28bfd3f69333c512553507f5f9798cb76"
 
 [[package]]
-name = "rustc_version"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfa0f585226d2e68097d4f95d113b15b83a82e819ab25717ec0590d9584ef366"
-dependencies = [
- "semver",
-]
-
-[[package]]
 name = "rustix"
 version = "0.38.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1571,25 +1575,24 @@ checksum = "80af6f9131f277a45a3fba6ce8e2258037bb0477a67e610d3c1fe046ab31de47"
 
 [[package]]
 name = "rustyline"
-version = "11.0.0"
+version = "14.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5dfc8644681285d1fb67a467fb3021bfea306b99b4146b166a1fe3ada965eece"
+checksum = "7803e8936da37efd9b6d4478277f4b2b9bb5cdb37a113e8d63222e58da647e63"
 dependencies = [
- "bitflags 1.3.2",
+ "bitflags 2.5.0",
  "cfg-if",
  "clipboard-win",
- "dirs-next",
  "fd-lock",
+ "home",
  "libc",
  "log",
  "memchr",
  "nix",
  "radix_trie",
- "scopeguard",
  "unicode-segmentation",
  "unicode-width",
  "utf8parse",
- "winapi",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1645,12 +1648,6 @@ name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
-
-[[package]]
-name = "semver"
-version = "1.0.22"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92d43fe69e652f3df9bdc2b85b2854a0825b86e4fb76bc44d945137d053639ca"
 
 [[package]]
 name = "serde"
@@ -1734,7 +1731,7 @@ checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
 [[package]]
 name = "starlark"
 version = "0.12.0"
-source = "git+https://github.com/facebookexperimental/starlark-rust.git?branch=main#293532ec1a4d1da232b4fe6b7f62ef174b7106fa"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#abaceca2b5b43c7cc3152182d7673e64130cde36"
 dependencies = [
  "allocative",
  "anyhow",
@@ -1773,7 +1770,7 @@ dependencies = [
 [[package]]
 name = "starlark_derive"
 version = "0.12.0"
-source = "git+https://github.com/facebookexperimental/starlark-rust.git?branch=main#293532ec1a4d1da232b4fe6b7f62ef174b7106fa"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#abaceca2b5b43c7cc3152182d7673e64130cde36"
 dependencies = [
  "dupe",
  "proc-macro2",
@@ -1784,7 +1781,7 @@ dependencies = [
 [[package]]
 name = "starlark_lsp"
 version = "0.12.0"
-source = "git+https://github.com/facebookexperimental/starlark-rust.git?branch=main#293532ec1a4d1da232b4fe6b7f62ef174b7106fa"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#abaceca2b5b43c7cc3152182d7673e64130cde36"
 dependencies = [
  "anyhow",
  "derivative",
@@ -1803,7 +1800,7 @@ dependencies = [
 [[package]]
 name = "starlark_map"
 version = "0.12.0"
-source = "git+https://github.com/facebookexperimental/starlark-rust.git?branch=main#293532ec1a4d1da232b4fe6b7f62ef174b7106fa"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#abaceca2b5b43c7cc3152182d7673e64130cde36"
 dependencies = [
  "allocative",
  "dupe",
@@ -1816,7 +1813,7 @@ dependencies = [
 [[package]]
 name = "starlark_syntax"
 version = "0.12.0"
-source = "git+https://github.com/facebookexperimental/starlark-rust.git?branch=main#293532ec1a4d1da232b4fe6b7f62ef174b7106fa"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#abaceca2b5b43c7cc3152182d7673e64130cde36"
 dependencies = [
  "allocative",
  "annotate-snippets",
@@ -1841,12 +1838,6 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
-
-[[package]]
-name = "str-buf"
-version = "1.0.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e08d8363704e6c71fc928674353e6b7c23dcea9d82d7012c8faf2a3a025f8d0"
 
 [[package]]
 name = "string_cache"

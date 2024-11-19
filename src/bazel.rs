@@ -223,12 +223,10 @@ impl<Client: BazelClient> BazelContext<Client> {
     fn url_for_doc(doc: &Doc) -> LspUrl {
         let url = match &doc.item {
             DocItem::Module(_) => Url::parse("starlark:/native/builtins.bzl").unwrap(),
-            DocItem::Object(_) => {
+            DocItem::Type(_) => {
                 Url::parse(&format!("starlark:/native/builtins/{}.bzl", doc.id.name)).unwrap()
             }
-            DocItem::Function(_) | DocItem::Property(_) => {
-                Url::parse("starlark:/native/builtins.bzl").unwrap()
-            }
+            DocItem::Member(_) => Url::parse("starlark:/native/builtins.bzl").unwrap(),
         };
         LspUrl::try_from(url).unwrap()
     }
@@ -612,6 +610,7 @@ impl<Client: BazelClient> BazelContext<Client> {
 
         let members: SmallMap<_, _> = builtin::build_language_to_doc_members(&language)
             .chain(builtin::builtins_to_doc_members(&builtins, file_type))
+            .map(|(name, member)| (name, DocItem::Member(member)))
             .collect();
 
         Ok(DocModule {
@@ -901,7 +900,7 @@ mod tests {
     use lsp_types::CompletionItemKind;
     use serde_json::json;
     use starlark::{
-        docs::{DocMember, DocModule, DocParam, DocReturn, DocString},
+        docs::{DocItem, DocMember, DocModule, DocParam, DocString},
         typing::Ty,
     };
     use starlark_lsp::{
@@ -1228,7 +1227,7 @@ mod tests {
             .unwrap();
 
         let f = match glob_member {
-            DocMember::Function(f) => f,
+            DocItem::Member(DocMember::Function(f)) => f,
             _ => panic!(),
         };
 
@@ -1288,24 +1287,48 @@ mod tests {
 
         let module = context.get_environment(&LspUrl::File(PathBuf::from("/foo/bar/defs.bzl")));
 
-        fn check_doc_not_empty(doc: Option<&DocString>) {
+        fn validate_doc_item(item: &DocItem) {
+            match item {
+                DocItem::Module(module) => {
+                    validate_doc_string(module.docs.as_ref());
+                    for member in module.members.values() {
+                        validate_doc_item(member)
+                    }
+                }
+                DocItem::Type(r#type) => {
+                    validate_doc_string(r#type.docs.as_ref());
+                    for member in r#type.members.values() {
+                        validate_doc_member(member);
+                    }
+                }
+                DocItem::Member(member) => {
+                    validate_doc_member(&member);
+                }
+            }
+        }
+
+        fn validate_doc_member(member: &DocMember) {
+            match member {
+                DocMember::Function(function) => {
+                    validate_doc_string(function.docs.as_ref());
+                    for param in &function.params {
+                        validate_doc_string(param.get_doc_string());
+                    }
+                }
+                DocMember::Property(property) => {
+                    validate_doc_string(property.docs.as_ref());
+                }
+            }
+        }
+
+        fn validate_doc_string(doc: Option<&DocString>) {
             if let Some(doc) = doc {
                 assert!(!doc.summary.trim().is_empty());
             }
         }
 
-        for (name, member) in module.members {
-            match member {
-                DocMember::Function(function) => {
-                    check_doc_not_empty(function.docs.as_ref());
-                    for param in function.params {
-                        check_doc_not_empty(param.get_doc_string());
-                    }
-                }
-                DocMember::Property(property) => {
-                    check_doc_not_empty(property.docs.as_ref());
-                }
-            }
+        for item in module.members.values() {
+            validate_doc_item(item)
         }
 
         Ok(())
