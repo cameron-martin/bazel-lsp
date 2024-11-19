@@ -13,6 +13,7 @@ rust_binary(
         "//src/builtin:builtin_proto_rust",
         "@crates//:anyhow",
         "@crates//:clap",
+        "@crates//:prost",
         "@crates//:either",
         "@crates//:hex",
         "@crates//:lsp-types",

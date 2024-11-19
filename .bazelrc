@@ -9,5 +9,7 @@ common --experimental_sibling_repository_layout
 
 build:ci --bes_results_url=https://bazel-lsp.buildbuddy.io/invocation/
 build:ci --bes_backend=grpcs://bazel-lsp.buildbuddy.io
+# Do not wait for BES upload to finish to avoid failing build if BES is not available.
+build:ci --bes_upload_mode=nowait_for_upload_complete
 build:ci --remote_cache=grpcs://bazel-lsp.buildbuddy.io
 build:ci --remote_timeout=3600
