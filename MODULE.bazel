@@ -42,3 +42,21 @@ bazel_dep(
 bazel_dep(name = "protobuf", version = "27.1")
 
 register_toolchains("//prost:prost_toolchain")
+
+bazel_dep(name = "hermetic_cc_toolchain", version = "3.1.1")
+
+zig_toolchains = use_extension("@hermetic_cc_toolchain//toolchain:ext.bzl", "toolchains")
+use_repo(zig_toolchains, "zig_sdk")
+
+# TODO:
+# - Add support for hermetic Windows toolchains after fix in zig around pthread.h support:
+# https://github.com/ziglang/zig/issues/10989
+# - Add support for hermetic Mac OS toolchain after hermetic_cc_toolchain fixes support:
+# https://github.com/uber/hermetic_cc_toolchain/issues/10
+
+register_toolchains(
+    # Use oldest Rust supported version of GLIBC to be as compatible as possible,
+    # see https://blog.rust-lang.org/2022/08/01/Increasing-glibc-kernel-requirements.html
+    "@zig_sdk//toolchain:x86_64-linux-gnu.2.17",
+    "@zig_sdk//toolchain:linux_arm64_gnu.2.17",
+)
