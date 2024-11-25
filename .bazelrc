@@ -3,9 +3,11 @@
 build --deleted_packages=fixtures/bzlmod/root,fixtures/simple/output_base/external/bar,fixtures/simple/output_base/external/foo,fixtures/simple/root,fixtures/simple/root/foo
 query --deleted_packages=fixtures/bzlmod/root,fixtures/simple/output_base/external/bar,fixtures/simple/output_base/external/foo,fixtures/simple/root,fixtures/simple/root/foo
 
+common --enable_platform_specific_config
+
 # This shortens paths on windows
-common --nolegacy_external_runfiles
-common --experimental_sibling_repository_layout
+common:windows --nolegacy_external_runfiles
+common:windows --experimental_sibling_repository_layout
 
 build:ci --bes_results_url=https://bazel-lsp.buildbuddy.io/invocation/
 build:ci --bes_backend=grpcs://bazel-lsp.buildbuddy.io
