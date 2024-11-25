@@ -4,6 +4,7 @@ build --deleted_packages=fixtures/bzlmod/root,fixtures/simple/output_base/extern
 query --deleted_packages=fixtures/bzlmod/root,fixtures/simple/output_base/external/bar,fixtures/simple/output_base/external/foo,fixtures/simple/root,fixtures/simple/root/foo
 
 common --enable_platform_specific_config
+build --enable_runfiles
 
 # This shortens paths on windows
 common:windows --nolegacy_external_runfiles
