@@ -6,7 +6,7 @@ common --enable_platform_specific_config
 build --deleted_packages=fixtures/bzlmod/root,fixtures/simple/output_base/external/bar,fixtures/simple/output_base/external/foo,fixtures/simple/root,fixtures/simple/root/foo
 query --deleted_packages=fixtures/bzlmod/root,fixtures/simple/output_base/external/bar,fixtures/simple/output_base/external/foo,fixtures/simple/root,fixtures/simple/root/foo
 
-common --enable_platform_specific_config
+# Test fixtures require runfiles on all platforms
 build --enable_runfiles
 
 # This shortens paths on windows
