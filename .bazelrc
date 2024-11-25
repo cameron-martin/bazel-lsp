@@ -6,6 +6,13 @@ common --enable_platform_specific_config
 build --deleted_packages=fixtures/bzlmod/root,fixtures/simple/output_base/external/bar,fixtures/simple/output_base/external/foo,fixtures/simple/root,fixtures/simple/root/foo
 query --deleted_packages=fixtures/bzlmod/root,fixtures/simple/output_base/external/bar,fixtures/simple/output_base/external/foo,fixtures/simple/root,fixtures/simple/root/foo
 
+# Test fixtures require runfiles on all platforms
+build --enable_runfiles
+
+# This shortens paths on windows
+common:windows --nolegacy_external_runfiles
+common:windows --experimental_sibling_repository_layout
+
 build:ci --bes_results_url=https://bazel-lsp.buildbuddy.io/invocation/
 build:ci --bes_backend=grpcs://bazel-lsp.buildbuddy.io
 # Do not wait for BES upload to finish to avoid failing build if BES is not available.
