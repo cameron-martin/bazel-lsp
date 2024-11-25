@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.2](https://github.com/cameron-martin/bazel-lsp/compare/v0.6.1...v0.6.2) (2024-11-25)
+
+
+### Bug Fixes
+
+* Use hermetic linux C++ toolchain ([1432ebc](https://github.com/cameron-martin/bazel-lsp/commit/1432ebcfb58f84ec32229a8b408f57a57a93b7b2))
+
 ## [0.6.1](https://github.com/cameron-martin/bazel-lsp/compare/v0.6.0...v0.6.1) (2024-06-29)
 
 
