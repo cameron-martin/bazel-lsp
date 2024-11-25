@@ -822,6 +822,7 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
+    use lsp_types::Url;
 
     use lsp_types::CompletionItemKind;
     use serde_json::json;
@@ -849,7 +850,7 @@ mod tests {
 
         assert_eq!(
             url,
-            LspUrl::File(fixture.external_dir("foo").join("foo.bzl"))
+            Url::from_file_path(fixture.external_dir("foo").join("foo.bzl")).unwrap().try_into()?
         );
 
         Ok(())
@@ -868,7 +869,7 @@ mod tests {
 
         assert_eq!(
             url,
-            LspUrl::File(fixture.external_dir("bar").join("bar.bzl"))
+            Url::from_file_path(fixture.external_dir("bar").join("bar.bzl")).unwrap().try_into()?
         );
 
         Ok(())
@@ -887,7 +888,7 @@ mod tests {
 
         assert_eq!(
             url,
-            LspUrl::File(fixture.external_dir("foo").join("foo.bzl"))
+            Url::from_file_path(fixture.external_dir("foo").join("foo.bzl")).unwrap().try_into()?
         );
 
         Ok(())
@@ -915,12 +916,12 @@ mod tests {
 
         assert_eq!(
             url,
-            LspUrl::File(
+            Url::from_file_path(
                 fixture
                     .external_dir("rules_rust~0.36.2")
                     .join("rust")
                     .join("defs.bzl")
-            )
+            ).unwrap().try_into()?
         );
 
         assert_eq!(context.client.profile.borrow().dump_repo_mapping, 1);
