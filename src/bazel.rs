@@ -517,7 +517,7 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
                     Ok(ast) => {
                         let diagnostics = self
                             .lint_module(uri, &ast)
-                            .into_map(|l| eval_message_to_lsp_diagnostic(EvalMessage::from(l)));
+                            .into_map(eval_message_to_lsp_diagnostic);
                         LspEvalResult {
                             diagnostics,
                             ast: Some(ast),
