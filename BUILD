@@ -21,6 +21,7 @@ rust_binary(
         "@crates//:serde_json",
         "@crates//:starlark",
         "@crates//:starlark_lsp",
+        "@crates//:starlark_syntax",
         "@crates//:thiserror",
     ],
 )

@@ -24,14 +24,12 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs;
 use std::io;
-use std::iter;
 use std::ops::Deref;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 
 use anyhow::anyhow;
-use either::Either;
 use lsp_types::CompletionItemKind;
 use lsp_types::Url;
 use prost::Message;
@@ -45,6 +43,8 @@ use starlark::docs::DocItem;
 use starlark::docs::DocModule;
 use starlark::errors::EvalMessage;
 use starlark::syntax::AstModule;
+use starlark::syntax::Dialect;
+use starlark_syntax::slice_vec_ext::VecExt;
 use starlark_lsp::completion::StringCompletionResult;
 use starlark_lsp::completion::StringCompletionType;
 use starlark_lsp::error::eval_message_to_lsp_diagnostic;
@@ -55,8 +55,6 @@ use starlark_lsp::server::StringLiteralResult;
 
 use crate::builtin;
 use crate::client::BazelClient;
-use crate::eval::dialect;
-use crate::eval::EvalResult;
 use crate::file_type::FileType;
 use crate::label::Label;
 use crate::workspace::BazelWorkspace;
@@ -165,23 +163,6 @@ impl<Client: BazelClient> BazelContext<Client> {
         })
     }
 
-    // Convert an anyhow over iterator of EvalMessage, into an iterator of EvalMessage
-    fn err(
-        file: &str,
-        result: starlark::Result<EvalResult<impl Iterator<Item = EvalMessage>>>,
-    ) -> EvalResult<impl Iterator<Item = EvalMessage>> {
-        match result {
-            Err(e) => EvalResult {
-                messages: Either::Left(iter::once(EvalMessage::from_error(Path::new(file), &e))),
-                ast: None,
-            },
-            Ok(res) => EvalResult {
-                messages: Either::Right(res.messages),
-                ast: res.ast,
-            },
-        }
-    }
-
     fn url_for_doc(doc: &Doc) -> LspUrl {
         let url = match &doc.item {
             DocItem::Module(_) => Url::parse("starlark:/native/builtins.bzl").unwrap(),
@@ -193,18 +174,13 @@ impl<Client: BazelClient> BazelContext<Client> {
         LspUrl::try_from(url).unwrap()
     }
 
-    fn go(&self, uri: &LspUrl, ast: AstModule) -> EvalResult<impl Iterator<Item = EvalMessage>> {
+    fn lint_module(&self, uri: &LspUrl, ast: &AstModule) -> Vec<EvalMessage> {
         let globals = self.get_bazel_globals_names(uri);
 
-        let warnings = ast
-            .lint(Some(globals).as_ref())
-            .into_iter()
-            .map(EvalMessage::from);
-
-        EvalResult {
-            messages: warnings,
-            ast: Some(ast),
-        }
+        ast.lint(Some(globals).as_ref())
+           .into_iter()
+           .map(EvalMessage::from)
+           .collect()
     }
 
     /// Gets the possibly-cached workspace for a directory, or creates a new one if it doesn't exist.
@@ -253,19 +229,6 @@ impl<Client: BazelClient> BazelContext<Client> {
         } else {
             Ok(None)
         }
-    }
-
-    fn file_with_contents(
-        &self,
-        uri: &LspUrl,
-        content: String,
-    ) -> EvalResult<impl Iterator<Item = EvalMessage>> {
-        Self::err(
-            &uri.path().to_string_lossy(),
-            AstModule::parse(&uri.path().to_string_lossy(), content, &dialect())
-                .map(|module| self.go(uri, module))
-                .map_err(Into::into),
-        )
     }
 
     // TODO: Consider caching this
@@ -549,12 +512,26 @@ impl<Client: BazelClient> BazelContext<Client> {
 impl<Client: BazelClient> LspContext for BazelContext<Client> {
     fn parse_file_with_contents(&self, uri: &LspUrl, content: String) -> LspEvalResult {
         match uri {
-            LspUrl::File(_) => {
-                let EvalResult { messages, ast } =
-                    self.file_with_contents(uri, content);
-                LspEvalResult {
-                    diagnostics: messages.map(eval_message_to_lsp_diagnostic).collect(),
-                    ast,
+            LspUrl::File(path) => {
+                match AstModule::parse(&path.to_string_lossy(), content, &Dialect::Extended) {
+                    Ok(ast) => {
+                        let diagnostics = self
+                            .lint_module(uri, &ast)
+                            .into_map(|l| eval_message_to_lsp_diagnostic(EvalMessage::from(l)));
+                        LspEvalResult {
+                            diagnostics,
+                            ast: Some(ast),
+                        }
+                    }
+                    Err(e) => {
+                        let diagnostics = vec![eval_message_to_lsp_diagnostic(
+                            EvalMessage::from_error(path, &e),
+                        )];
+                        LspEvalResult {
+                            diagnostics,
+                            ast: None,
+                        }
+                    }
                 }
             }
             _ => LspEvalResult::default(),

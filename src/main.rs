@@ -1,7 +1,6 @@
 mod bazel;
 mod builtin;
 mod client;
-mod eval;
 mod file_type;
 mod label;
 #[cfg(test)]
