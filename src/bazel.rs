@@ -44,7 +44,6 @@ use starlark::docs::DocModule;
 use starlark::errors::EvalMessage;
 use starlark::syntax::AstModule;
 use starlark::syntax::Dialect;
-use starlark_syntax::slice_vec_ext::VecExt;
 use starlark_lsp::completion::StringCompletionResult;
 use starlark_lsp::completion::StringCompletionType;
 use starlark_lsp::error::eval_message_to_lsp_diagnostic;
@@ -52,6 +51,7 @@ use starlark_lsp::server::LspContext;
 use starlark_lsp::server::LspEvalResult;
 use starlark_lsp::server::LspUrl;
 use starlark_lsp::server::StringLiteralResult;
+use starlark_syntax::slice_vec_ext::VecExt;
 
 use crate::builtin;
 use crate::client::BazelClient;
@@ -137,11 +137,19 @@ pub(crate) struct BazelContext<Client> {
     pub(crate) client: Client,
 }
 
+fn is_workspace_file(uri: &LspUrl) -> bool {
+    match uri {
+        LspUrl::File(path) => path
+            .file_name()
+            .map(|name| name == "WORKSPACE" || name == "WORKSPACE.bazel")
+            .unwrap_or(false),
+        LspUrl::Starlark(_) => false,
+        LspUrl::Other(_) => false,
+    }
+}
+
 impl<Client: BazelClient> BazelContext<Client> {
-    pub(crate) fn new(
-        client: Client,
-        query_output_base: Option<PathBuf>,
-    ) -> anyhow::Result<Self> {
+    pub(crate) fn new(client: Client, query_output_base: Option<PathBuf>) -> anyhow::Result<Self> {
         let mut builtins: HashMap<LspUrl, Vec<Doc>> = HashMap::new();
         let mut builtin_symbols: HashMap<String, LspUrl> = HashMap::new();
         for doc in get_registered_starlark_docs() {
@@ -177,10 +185,13 @@ impl<Client: BazelClient> BazelContext<Client> {
     fn lint_module(&self, uri: &LspUrl, ast: &AstModule) -> Vec<EvalMessage> {
         let globals = self.get_bazel_globals_names(uri);
 
+        let is_workspace_file = is_workspace_file(uri);
+
         ast.lint(Some(globals).as_ref())
-           .into_iter()
-           .map(EvalMessage::from)
-           .collect()
+            .into_iter()
+            .filter(|lint| !(is_workspace_file && lint.short_name == "misplaced-load"))
+            .map(EvalMessage::from)
+            .collect()
     }
 
     /// Gets the possibly-cached workspace for a directory, or creates a new one if it doesn't exist.
@@ -458,7 +469,6 @@ impl<Client: BazelClient> BazelContext<Client> {
     /// test_suite etc.).
     // TODO: Consider caching this
     fn get_bazel_globals(&self, uri: &LspUrl) -> (builtin::BuildLanguage, builtin::Builtins) {
-
         let language_proto = self.get_build_language_proto(uri);
 
         let language_proto = language_proto
@@ -493,17 +503,15 @@ impl<Client: BazelClient> BazelContext<Client> {
     fn get_bazel_globals_names(&self, uri: &LspUrl) -> HashSet<String> {
         let (language, builtins) = self.get_bazel_globals(uri);
 
-        language.rule
+        language
+            .rule
             .iter()
             .map(|rule| rule.name.clone())
+            .chain(builtins.global.iter().map(|global| global.name.clone()))
             .chain(
-                builtins.global
+                builtin::MISSING_GLOBALS
                     .iter()
-                    .map(|global| global.name.clone())
-            )
-            .chain(
-                builtin::MISSING_GLOBALS.iter()
-                    .map(|missing| missing.to_string())
+                    .map(|missing| missing.to_string()),
             )
             .collect()
     }
@@ -798,8 +806,8 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
 
 #[cfg(test)]
 mod tests {
+    use lsp_types::{NumberOrString, Url};
     use std::path::PathBuf;
-    use lsp_types::Url;
 
     use lsp_types::CompletionItemKind;
     use serde_json::json;
@@ -827,7 +835,9 @@ mod tests {
 
         assert_eq!(
             url,
-            Url::from_file_path(fixture.external_dir("foo").join("foo.bzl")).unwrap().try_into()?
+            Url::from_file_path(fixture.external_dir("foo").join("foo.bzl"))
+                .unwrap()
+                .try_into()?
         );
 
         Ok(())
@@ -846,7 +856,9 @@ mod tests {
 
         assert_eq!(
             url,
-            Url::from_file_path(fixture.external_dir("bar").join("bar.bzl")).unwrap().try_into()?
+            Url::from_file_path(fixture.external_dir("bar").join("bar.bzl"))
+                .unwrap()
+                .try_into()?
         );
 
         Ok(())
@@ -865,7 +877,9 @@ mod tests {
 
         assert_eq!(
             url,
-            Url::from_file_path(fixture.external_dir("foo").join("foo.bzl")).unwrap().try_into()?
+            Url::from_file_path(fixture.external_dir("foo").join("foo.bzl"))
+                .unwrap()
+                .try_into()?
         );
 
         Ok(())
@@ -898,7 +912,9 @@ mod tests {
                     .external_dir("rules_rust~0.36.2")
                     .join("rust")
                     .join("defs.bzl")
-            ).unwrap().try_into()?
+            )
+            .unwrap()
+            .try_into()?
         );
 
         assert_eq!(context.client.profile.borrow().dump_repo_mapping, 1);
@@ -1253,11 +1269,53 @@ unknown_global_function(42);
 a=int(7);
 
 register_toolchains([':my_toolchain']);
-".to_string()
+"
+            .to_string(),
         );
 
         assert_eq!(1, result.diagnostics.len());
-        assert_eq!("Use of undefined variable `unknown_global_function`", result.diagnostics[0].message);
+        assert_eq!(
+            "Use of undefined variable `unknown_global_function`",
+            result.diagnostics[0].message
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn reports_misplaced_load_correctly() -> anyhow::Result<()> {
+        let fixture = TestFixture::new("simple")?;
+        let context = fixture.context()?;
+
+        let files = [
+            ("/foo.bzl", true),
+            ("/BUILD", true),
+            ("/BUILD.bazel", true),
+            ("/WORKSPACE", false),
+            ("/WORKSPACE.bazel", false),
+        ];
+
+        for (name, expected_lint) in files {
+            let result = context.parse_file_with_contents(
+                &LspUrl::File(PathBuf::from(name)),
+                "
+test_suite(name='my_test_suite');
+
+load('foo.bzl', 'bar')
+"
+                .to_string(),
+            );
+
+            let has_lint = result.diagnostics.iter().any(|diagnostic| {
+                diagnostic.code == Some(NumberOrString::String("misplaced-load".into()))
+            });
+
+            if expected_lint {
+                assert!(has_lint, "Expected to have lint in {}", name);
+            } else {
+                assert!(!has_lint, "Expected to not have lint in {}", name);
+            }
+        }
 
         Ok(())
     }
