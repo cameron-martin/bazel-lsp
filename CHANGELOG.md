@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.3](https://github.com/cameron-martin/bazel-lsp/compare/v0.6.2...v0.6.3) (2024-11-27)
+
+
+### Bug Fixes
+
+* Fix linting of global symbols ([#51](https://github.com/cameron-martin/bazel-lsp/issues/51)) ([e2c0d8d](https://github.com/cameron-martin/bazel-lsp/commit/e2c0d8d8b140f0822bdbd2d9b64ab91d65fd0d17))
+* Remove misplaced-load lints from WORKSPACE files ([#61](https://github.com/cameron-martin/bazel-lsp/issues/61)) ([951cdd4](https://github.com/cameron-martin/bazel-lsp/commit/951cdd4ab32d6fbe91270fcece8d30704d71d7e8))
+
 ## [0.6.2](https://github.com/cameron-martin/bazel-lsp/compare/v0.6.1...v0.6.2) (2024-11-25)
 
 
