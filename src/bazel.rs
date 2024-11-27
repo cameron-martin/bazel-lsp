@@ -24,14 +24,12 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs;
 use std::io;
-use std::iter;
 use std::ops::Deref;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 
 use anyhow::anyhow;
-use either::Either;
 use lsp_types::CompletionItemKind;
 use lsp_types::Url;
 use prost::Message;
@@ -43,11 +41,10 @@ use starlark::docs::render_docs_as_code;
 use starlark::docs::Doc;
 use starlark::docs::DocItem;
 use starlark::docs::DocModule;
-use starlark::environment::FrozenModule;
-use starlark::environment::Module;
 use starlark::errors::EvalMessage;
-use starlark::eval::Evaluator;
 use starlark::syntax::AstModule;
+use starlark::syntax::Dialect;
+use starlark_syntax::slice_vec_ext::VecExt;
 use starlark_lsp::completion::StringCompletionResult;
 use starlark_lsp::completion::StringCompletionType;
 use starlark_lsp::error::eval_message_to_lsp_diagnostic;
@@ -58,10 +55,6 @@ use starlark_lsp::server::StringLiteralResult;
 
 use crate::builtin;
 use crate::client::BazelClient;
-use crate::eval::dialect;
-use crate::eval::globals;
-use crate::eval::ContextMode;
-use crate::eval::EvalResult;
 use crate::file_type::FileType;
 use crate::label::Label;
 use crate::workspace::BazelWorkspace;
@@ -139,10 +132,6 @@ struct FilesystemCompletionOptions {
 pub(crate) struct BazelContext<Client> {
     workspaces: RefCell<HashMap<PathBuf, Rc<BazelWorkspace>>>,
     query_output_base: Option<PathBuf>,
-    pub(crate) mode: ContextMode,
-    pub(crate) print_non_none: bool,
-    pub(crate) prelude: Vec<FrozenModule>,
-    pub(crate) module: Option<Module>,
     pub(crate) builtin_docs: HashMap<LspUrl, String>,
     pub(crate) builtin_symbols: HashMap<String, LspUrl>,
     pub(crate) client: Client,
@@ -151,33 +140,8 @@ pub(crate) struct BazelContext<Client> {
 impl<Client: BazelClient> BazelContext<Client> {
     pub(crate) fn new(
         client: Client,
-        mode: ContextMode,
-        print_non_none: bool,
-        prelude: &[PathBuf],
-        module: bool,
         query_output_base: Option<PathBuf>,
     ) -> anyhow::Result<Self> {
-        let globals = globals();
-        let prelude: Vec<_> = prelude
-            .iter()
-            .map(|x| {
-                let env = Module::new();
-                {
-                    let mut eval = Evaluator::new(&env);
-                    let module = AstModule::parse_file(x, &dialect())
-                        .map_err(starlark::Error::into_anyhow)?;
-                    eval.eval_module(module, &globals)
-                        .map_err(starlark::Error::into_anyhow)?;
-                }
-                env.freeze()
-            })
-            .collect::<anyhow::Result<_>>()?;
-
-        let module = if module {
-            Some(Self::new_module(&prelude))
-        } else {
-            None
-        };
         let mut builtins: HashMap<LspUrl, Vec<Doc>> = HashMap::new();
         let mut builtin_symbols: HashMap<String, LspUrl> = HashMap::new();
         for doc in get_registered_starlark_docs() {
@@ -193,31 +157,10 @@ impl<Client: BazelClient> BazelContext<Client> {
         Ok(Self {
             workspaces: RefCell::new(HashMap::new()),
             query_output_base,
-            mode,
-            print_non_none,
-            prelude,
-            module,
             builtin_docs,
             builtin_symbols,
             client,
         })
-    }
-
-    // Convert an anyhow over iterator of EvalMessage, into an iterator of EvalMessage
-    fn err(
-        file: &str,
-        result: starlark::Result<EvalResult<impl Iterator<Item = EvalMessage>>>,
-    ) -> EvalResult<impl Iterator<Item = EvalMessage>> {
-        match result {
-            Err(e) => EvalResult {
-                messages: Either::Left(iter::once(EvalMessage::from_error(Path::new(file), &e))),
-                ast: None,
-            },
-            Ok(res) => EvalResult {
-                messages: Either::Right(res.messages),
-                ast: res.ast,
-            },
-        }
     }
 
     fn url_for_doc(doc: &Doc) -> LspUrl {
@@ -231,83 +174,13 @@ impl<Client: BazelClient> BazelContext<Client> {
         LspUrl::try_from(url).unwrap()
     }
 
-    fn new_module(prelude: &[FrozenModule]) -> Module {
-        let module = Module::new();
-        for p in prelude {
-            module.import_public_symbols(p);
-        }
-        module
-    }
+    fn lint_module(&self, uri: &LspUrl, ast: &AstModule) -> Vec<EvalMessage> {
+        let globals = self.get_bazel_globals_names(uri);
 
-    fn go(&self, file: &str, ast: AstModule) -> EvalResult<impl Iterator<Item = EvalMessage>> {
-        let mut warnings = Either::Left(iter::empty());
-        let mut errors = Either::Left(iter::empty());
-        let final_ast = match self.mode {
-            ContextMode::Check => {
-                warnings = Either::Right(self.check(&ast));
-                Some(ast)
-            }
-            ContextMode::Run => {
-                errors = Either::Right(self.run(file, ast).messages);
-                None
-            }
-        };
-        EvalResult {
-            messages: warnings.chain(errors),
-            ast: final_ast,
-        }
-    }
-
-    fn run(&self, file: &str, ast: AstModule) -> EvalResult<impl Iterator<Item = EvalMessage>> {
-        let new_module;
-        let module = match self.module.as_ref() {
-            Some(module) => module,
-            None => {
-                new_module = Self::new_module(&self.prelude);
-                &new_module
-            }
-        };
-        let mut eval = Evaluator::new(module);
-        eval.enable_terminal_breakpoint_console();
-        let globals = globals();
-        Self::err(
-            file,
-            eval.eval_module(ast, &globals)
-                .map(|v| {
-                    if self.print_non_none && !v.is_none() {
-                        println!("{}", v);
-                    }
-                    EvalResult {
-                        messages: iter::empty(),
-                        ast: None,
-                    }
-                })
-                .map_err(Into::into),
-        )
-    }
-
-    fn check(&self, module: &AstModule) -> impl Iterator<Item = EvalMessage> {
-        let globals = if self.prelude.is_empty() {
-            None
-        } else {
-            let mut globals = HashSet::new();
-            for modu in &self.prelude {
-                for name in modu.names() {
-                    globals.insert(name.as_str().to_owned());
-                }
-            }
-
-            for global_symbol in self.builtin_symbols.keys() {
-                globals.insert(global_symbol.to_owned());
-            }
-
-            Some(globals)
-        };
-
-        module
-            .lint(globals.as_ref())
-            .into_iter()
-            .map(EvalMessage::from)
+        ast.lint(Some(globals).as_ref())
+           .into_iter()
+           .map(EvalMessage::from)
+           .collect()
     }
 
     /// Gets the possibly-cached workspace for a directory, or creates a new one if it doesn't exist.
@@ -356,19 +229,6 @@ impl<Client: BazelClient> BazelContext<Client> {
         } else {
             Ok(None)
         }
-    }
-
-    pub(crate) fn file_with_contents(
-        &self,
-        filename: &str,
-        content: String,
-    ) -> EvalResult<impl Iterator<Item = EvalMessage>> {
-        Self::err(
-            filename,
-            AstModule::parse(filename, content, &dialect())
-                .map(|module| self.go(filename, module))
-                .map_err(Into::into),
-        )
     }
 
     // TODO: Consider caching this
@@ -594,8 +454,10 @@ impl<Client: BazelClient> BazelContext<Client> {
         self.client.build_language(&workspace)
     }
 
-    fn try_get_environment(&self, uri: &LspUrl) -> anyhow::Result<DocModule> {
-        let file_type = FileType::from_lsp_url(uri);
+    /// Returns protos for bazel globals (like int, str, dir; but also e.g. cc_library, alias,
+    /// test_suite etc.).
+    // TODO: Consider caching this
+    fn get_bazel_globals(&self, uri: &LspUrl) -> (builtin::BuildLanguage, builtin::Builtins) {
 
         let language_proto = self.get_build_language_proto(uri);
 
@@ -605,8 +467,17 @@ impl<Client: BazelClient> BazelContext<Client> {
 
         let language = builtin::BuildLanguage::decode(&language_proto[..]).unwrap();
 
+        // TODO: builtins are also dependent on bazel version, but there is no way to obtain those,
+        // see https://github.com/bazel-contrib/vscode-bazel/issues/1.
         let builtins_proto = include_bytes!("builtin/builtin.pb");
         let builtins = builtin::Builtins::decode(&builtins_proto[..]).unwrap();
+
+        (language, builtins)
+    }
+
+    fn try_get_environment(&self, uri: &LspUrl) -> anyhow::Result<DocModule> {
+        let file_type = FileType::from_lsp_url(uri);
+        let (language, builtins) = self.get_bazel_globals(uri);
 
         let members: SmallMap<_, _> = builtin::build_language_to_doc_members(&language)
             .chain(builtin::builtins_to_doc_members(&builtins, file_type))
@@ -618,17 +489,49 @@ impl<Client: BazelClient> BazelContext<Client> {
             members,
         })
     }
+
+    fn get_bazel_globals_names(&self, uri: &LspUrl) -> HashSet<String> {
+        let (language, builtins) = self.get_bazel_globals(uri);
+
+        language.rule
+            .iter()
+            .map(|rule| rule.name.clone())
+            .chain(
+                builtins.global
+                    .iter()
+                    .map(|global| global.name.clone())
+            )
+            .chain(
+                builtin::MISSING_GLOBALS.iter()
+                    .map(|missing| missing.to_string())
+            )
+            .collect()
+    }
 }
 
 impl<Client: BazelClient> LspContext for BazelContext<Client> {
     fn parse_file_with_contents(&self, uri: &LspUrl, content: String) -> LspEvalResult {
         match uri {
-            LspUrl::File(uri) => {
-                let EvalResult { messages, ast } =
-                    self.file_with_contents(&uri.to_string_lossy(), content);
-                LspEvalResult {
-                    diagnostics: messages.map(eval_message_to_lsp_diagnostic).collect(),
-                    ast,
+            LspUrl::File(path) => {
+                match AstModule::parse(&path.to_string_lossy(), content, &Dialect::Extended) {
+                    Ok(ast) => {
+                        let diagnostics = self
+                            .lint_module(uri, &ast)
+                            .into_map(eval_message_to_lsp_diagnostic);
+                        LspEvalResult {
+                            diagnostics,
+                            ast: Some(ast),
+                        }
+                    }
+                    Err(e) => {
+                        let diagnostics = vec![eval_message_to_lsp_diagnostic(
+                            EvalMessage::from_error(path, &e),
+                        )];
+                        LspEvalResult {
+                            diagnostics,
+                            ast: None,
+                        }
+                    }
                 }
             }
             _ => LspEvalResult::default(),
@@ -1203,9 +1106,9 @@ mod tests {
             module.members.iter().any(|(member, _)| member == value)
         }
 
-        // let module = context.get_environment(&LspUrl::File(PathBuf::from("/foo/bar.bzl")));
+        let module = context.get_environment(&LspUrl::File(PathBuf::from("/foo/bar.bzl")));
 
-        // assert!(module_contains(&module, "cc_library"));
+        assert!(module_contains(&module, "cc_library"));
 
         let module = context.get_environment(&LspUrl::File(PathBuf::from("/foo/bar/BUILD")));
 
@@ -1331,6 +1234,30 @@ mod tests {
         for item in module.members.values() {
             validate_doc_item(item)
         }
+
+        Ok(())
+    }
+
+    #[test]
+    fn reports_undefined_global_symbols() -> anyhow::Result<()> {
+        let fixture = TestFixture::new("simple")?;
+        let context = fixture.context()?;
+
+        let result = context.parse_file_with_contents(
+            &LspUrl::File(PathBuf::from("/foo.bzl")),
+            "
+test_suite(name='my_test_suite');
+
+unknown_global_function(42);
+
+a=int(7);
+
+register_toolchains([':my_toolchain']);
+".to_string()
+        );
+
+        assert_eq!(1, result.diagnostics.len());
+        assert_eq!("Use of undefined variable `unknown_global_function`", result.diagnostics[0].message);
 
         Ok(())
     }

@@ -273,6 +273,7 @@ dependencies = [
  "serde_json",
  "starlark",
  "starlark_lsp",
+ "starlark_syntax",
  "thiserror",
  "tonic",
 ]

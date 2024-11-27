@@ -1,7 +1,6 @@
 mod bazel;
 mod builtin;
 mod client;
-mod eval;
 mod file_type;
 mod label;
 #[cfg(test)]
@@ -13,7 +12,6 @@ use std::{env, path::PathBuf};
 use bazel::BazelContext;
 use clap::Parser;
 use client::BazelCli;
-use eval::ContextMode;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -51,10 +49,6 @@ fn main() -> anyhow::Result<()> {
 
     let ctx = BazelContext::new(
         BazelCli::new(args.bazel),
-        ContextMode::Check,
-        true,
-        &[],
-        true,
         query_output_base,
     )?;
 
