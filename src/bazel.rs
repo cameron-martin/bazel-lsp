@@ -36,9 +36,6 @@ use prost::Message;
 use starlark::analysis::find_call_name::AstModuleFindCallName;
 use starlark::analysis::AstModuleLint;
 use starlark::collections::SmallMap;
-use starlark::docs::get_registered_starlark_docs;
-use starlark::docs::render_docs_as_code;
-use starlark::docs::Doc;
 use starlark::docs::DocItem;
 use starlark::docs::DocModule;
 use starlark::errors::EvalMessage;
@@ -132,8 +129,6 @@ struct FilesystemCompletionOptions {
 pub(crate) struct BazelContext<Client> {
     workspaces: RefCell<HashMap<PathBuf, Rc<BazelWorkspace>>>,
     query_output_base: Option<PathBuf>,
-    pub(crate) builtin_docs: HashMap<LspUrl, String>,
-    pub(crate) builtin_symbols: HashMap<String, LspUrl>,
     pub(crate) client: Client,
 }
 
@@ -150,36 +145,11 @@ fn is_workspace_file(uri: &LspUrl) -> bool {
 
 impl<Client: BazelClient> BazelContext<Client> {
     pub(crate) fn new(client: Client, query_output_base: Option<PathBuf>) -> anyhow::Result<Self> {
-        let mut builtins: HashMap<LspUrl, Vec<Doc>> = HashMap::new();
-        let mut builtin_symbols: HashMap<String, LspUrl> = HashMap::new();
-        for doc in get_registered_starlark_docs() {
-            let uri = Self::url_for_doc(&doc);
-            builtin_symbols.insert(doc.id.name.clone(), uri.clone());
-            builtins.entry(uri).or_default().push(doc);
-        }
-        let builtin_docs = builtins
-            .into_iter()
-            .map(|(u, ds)| (u, render_docs_as_code(&ds)))
-            .collect();
-
         Ok(Self {
             workspaces: RefCell::new(HashMap::new()),
             query_output_base,
-            builtin_docs,
-            builtin_symbols,
             client,
         })
-    }
-
-    fn url_for_doc(doc: &Doc) -> LspUrl {
-        let url = match &doc.item {
-            DocItem::Module(_) => Url::parse("starlark:/native/builtins.bzl").unwrap(),
-            DocItem::Type(_) => {
-                Url::parse(&format!("starlark:/native/builtins/{}.bzl", doc.id.name)).unwrap()
-            }
-            DocItem::Member(_) => Url::parse("starlark:/native/builtins.bzl").unwrap(),
-        };
-        LspUrl::try_from(url).unwrap()
     }
 
     fn lint_module(&self, uri: &LspUrl, ast: &AstModule) -> Vec<EvalMessage> {
@@ -676,7 +646,7 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
                 },
                 false => Err(ContextError::NotAbsolute(uri.clone()).into()),
             },
-            LspUrl::Starlark(_) => Ok(self.builtin_docs.get(uri).cloned()),
+            LspUrl::Starlark(_) => Ok(None),
             _ => Err(ContextError::WrongScheme("file://".to_owned(), uri.clone()).into()),
         }
     }
@@ -690,7 +660,7 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
         _current_file: &LspUrl,
         symbol: &str,
     ) -> anyhow::Result<Option<LspUrl>> {
-        Ok(self.builtin_symbols.get(symbol).cloned())
+        Ok(None)
     }
 
     fn get_string_completion_options(
