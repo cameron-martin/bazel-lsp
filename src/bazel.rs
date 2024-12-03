@@ -658,7 +658,7 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
     fn get_url_for_global_symbol(
         &self,
         _current_file: &LspUrl,
-        symbol: &str,
+        _symbol: &str,
     ) -> anyhow::Result<Option<LspUrl>> {
         Ok(None)
     }
@@ -782,7 +782,7 @@ mod tests {
     use lsp_types::CompletionItemKind;
     use serde_json::json;
     use starlark::{
-        docs::{DocItem, DocMember, DocModule, DocParam, DocString},
+        docs::{DocFunction, DocItem, DocMember, DocModule, DocParam, DocString},
         typing::Ty,
     };
     use starlark_lsp::{
@@ -1110,21 +1110,23 @@ mod tests {
 
         let module = context.get_environment(&LspUrl::File(PathBuf::from("/foo/bar/BUILD")));
 
-        let (_, glob_member) = module
-            .members
-            .iter()
-            .find(|(member, _)| *member == "glob")
-            .unwrap();
+        fn doc_function<'a>(module: &'a DocModule, func_name: &str) -> &'a DocFunction {
+            let (_, glob_member) = module
+                .members
+                .iter()
+                .find(|(member, _)| *member == func_name)
+                .unwrap();
 
-        let f = match glob_member {
-            DocItem::Member(DocMember::Function(f)) => f,
-            _ => panic!(),
-        };
+            match glob_member {
+                DocItem::Member(DocMember::Function(f)) => f,
+                _ => panic!(),
+            }
+        }
 
         assert_eq!(
-            *f.params,
+            doc_function(&module, "glob").params.pos_or_named,
             vec![
-                DocParam::Arg {
+                DocParam {
                     name: "include".into(),
                     default_value: Some("[]".into()),
                     docs: Some(DocString {
@@ -1133,7 +1135,7 @@ mod tests {
                     }),
                     typ: Ty::any(),
                 },
-                DocParam::Arg {
+                DocParam {
                     name: "exclude".into(),
                     default_value: Some("[]".into()),
                     docs: Some(DocString {
@@ -1142,7 +1144,7 @@ mod tests {
                     }),
                     typ: Ty::any(),
                 },
-                DocParam::Arg {
+                DocParam {
                     name: "exclude_directories".into(),
                     default_value: Some("1".into()),
                     docs: Some(DocString {
@@ -1151,7 +1153,7 @@ mod tests {
                     }),
                     typ: Ty::any(),
                 },
-                DocParam::Arg {
+                DocParam {
                     name: "allow_empty".into(),
                     // TODO: Fix this
                     default_value: Some("unbound".into()),
@@ -1162,6 +1164,32 @@ mod tests {
                     typ: Ty::any(),
                 },
             ]
+        );
+
+        assert_eq!(
+            doc_function(&module, "max").params.args,
+            Some(DocParam {
+                name: "args".into(),
+                default_value: None,
+                docs: Some(DocString {
+                    summary: "The elements to be checked.".into(),
+                    details: None,
+                }),
+                typ: Ty::any(),
+            })
+        );
+
+        assert_eq!(
+            doc_function(&module, "dict").params.kwargs,
+            Some(DocParam {
+                name: "kwargs".into(),
+                default_value: None,
+                docs: Some(DocString {
+                    summary: "Dictionary of additional entries.".into(),
+                    details: None,
+                }),
+                typ: Ty::any(),
+            })
         );
 
         Ok(())
@@ -1201,7 +1229,7 @@ mod tests {
             match member {
                 DocMember::Function(function) => {
                     validate_doc_string(function.docs.as_ref());
-                    for param in &function.params {
+                    for param in &function.params.pos_or_named {
                         validate_doc_string(param.get_doc_string());
                     }
                 }
