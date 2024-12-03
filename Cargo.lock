@@ -51,7 +51,7 @@ dependencies = [
 [[package]]
 name = "allocative"
 version = "0.3.3"
-source = "git+https://github.com/facebook/starlark-rust.git?branch=main#abaceca2b5b43c7cc3152182d7673e64130cde36"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#760df74a5af3e2ebb903949f74071df9dae62b95"
 dependencies = [
  "allocative_derive",
  "bumpalo",
@@ -63,7 +63,7 @@ dependencies = [
 [[package]]
 name = "allocative_derive"
 version = "0.3.3"
-source = "git+https://github.com/facebook/starlark-rust.git?branch=main#abaceca2b5b43c7cc3152182d7673e64130cde36"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#760df74a5af3e2ebb903949f74071df9dae62b95"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -401,7 +401,7 @@ dependencies = [
 [[package]]
 name = "cmp_any"
 version = "0.8.1"
-source = "git+https://github.com/facebook/starlark-rust.git?branch=main#abaceca2b5b43c7cc3152182d7673e64130cde36"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#760df74a5af3e2ebb903949f74071df9dae62b95"
 
 [[package]]
 name = "colorchoice"
@@ -523,7 +523,7 @@ dependencies = [
 [[package]]
 name = "display_container"
 version = "0.9.0"
-source = "git+https://github.com/facebook/starlark-rust.git?branch=main#abaceca2b5b43c7cc3152182d7673e64130cde36"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#760df74a5af3e2ebb903949f74071df9dae62b95"
 dependencies = [
  "either",
  "indenter",
@@ -532,7 +532,7 @@ dependencies = [
 [[package]]
 name = "dupe"
 version = "0.9.0"
-source = "git+https://github.com/facebook/starlark-rust.git?branch=main#abaceca2b5b43c7cc3152182d7673e64130cde36"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#760df74a5af3e2ebb903949f74071df9dae62b95"
 dependencies = [
  "dupe_derive",
 ]
@@ -540,7 +540,7 @@ dependencies = [
 [[package]]
 name = "dupe_derive"
 version = "0.9.0"
-source = "git+https://github.com/facebook/starlark-rust.git?branch=main#abaceca2b5b43c7cc3152182d7673e64130cde36"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#760df74a5af3e2ebb903949f74071df9dae62b95"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -907,6 +907,15 @@ name = "itertools"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
 dependencies = [
  "either",
 ]
@@ -1741,7 +1750,7 @@ checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
 [[package]]
 name = "starlark"
 version = "0.12.0"
-source = "git+https://github.com/facebook/starlark-rust.git?branch=main#abaceca2b5b43c7cc3152182d7673e64130cde36"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#760df74a5af3e2ebb903949f74071df9dae62b95"
 dependencies = [
  "allocative",
  "anyhow",
@@ -1756,7 +1765,7 @@ dependencies = [
  "erased-serde",
  "hashbrown 0.14.3",
  "inventory",
- "itertools 0.10.5",
+ "itertools 0.13.0",
  "maplit",
  "memoffset",
  "num-bigint",
@@ -1780,7 +1789,7 @@ dependencies = [
 [[package]]
 name = "starlark_derive"
 version = "0.12.0"
-source = "git+https://github.com/facebook/starlark-rust.git?branch=main#abaceca2b5b43c7cc3152182d7673e64130cde36"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#760df74a5af3e2ebb903949f74071df9dae62b95"
 dependencies = [
  "dupe",
  "proc-macro2",
@@ -1791,13 +1800,13 @@ dependencies = [
 [[package]]
 name = "starlark_lsp"
 version = "0.12.0"
-source = "git+https://github.com/facebook/starlark-rust.git?branch=main#abaceca2b5b43c7cc3152182d7673e64130cde36"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#760df74a5af3e2ebb903949f74071df9dae62b95"
 dependencies = [
  "anyhow",
  "derivative",
  "derive_more",
  "dupe",
- "itertools 0.10.5",
+ "itertools 0.13.0",
  "lsp-server",
  "lsp-types",
  "serde",
@@ -1810,7 +1819,7 @@ dependencies = [
 [[package]]
 name = "starlark_map"
 version = "0.12.0"
-source = "git+https://github.com/facebook/starlark-rust.git?branch=main#abaceca2b5b43c7cc3152182d7673e64130cde36"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#760df74a5af3e2ebb903949f74071df9dae62b95"
 dependencies = [
  "allocative",
  "dupe",
@@ -1823,7 +1832,7 @@ dependencies = [
 [[package]]
 name = "starlark_syntax"
 version = "0.12.0"
-source = "git+https://github.com/facebook/starlark-rust.git?branch=main#abaceca2b5b43c7cc3152182d7673e64130cde36"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#760df74a5af3e2ebb903949f74071df9dae62b95"
 dependencies = [
  "allocative",
  "annotate-snippets",

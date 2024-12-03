@@ -1,7 +1,7 @@
 pub use build_proto::blaze_query::*;
 pub use builtin_proto::builtin::*;
 use starlark::{
-    docs::{DocFunction, DocMember, DocParam, DocProperty, DocString},
+    docs::{DocFunction, DocMember, DocParam, DocParams, DocProperty, DocString},
     typing::Ty,
 };
 
@@ -9,13 +9,12 @@ use crate::file_type::FileType;
 
 /// Names of globals missing in builtins reported by bazel.
 /// See e.g. https://github.com/bazel-contrib/vscode-bazel/issues/1#issuecomment-2036369868
-pub static MISSING_GLOBALS: &'static[&'static str] = &[
+pub static MISSING_GLOBALS: &'static [&'static str] = &[
     // All values from https://bazel.build/rules/lib/globals/workspace
     "bind",
     "register_execution_platforms",
     "register_toolchains",
     "workspace",
-
     // Values from https://bazel.build/rules/lib/globals/module
     "archive_override",
     "bazel_dep",
@@ -32,17 +31,14 @@ pub static MISSING_GLOBALS: &'static[&'static str] = &[
     "use_extension",
     "use_repo",
     "use_repo_rule",
-
     // Missing values from https://bazel.build/rules/lib/globals/build
     "package",
     "repo_name",
-
     // Missing values from https://bazel.build/rules/lib/globals/bzl
     "exec_transition",
     "module_extension",
     "repository_rule",
     "tag_class",
-
     // Marked as not documented on https://github.com/bazelbuild/bazel/blob/master/src/main/java/com/google/devtools/build/lib/packages/BuildGlobals.java
     "licenses",
     "environment_group",
@@ -65,19 +61,22 @@ pub fn rule_to_doc_member(rule: &RuleDefinition) -> DocMember {
             .documentation
             .as_ref()
             .and_then(|doc| create_docstring(doc)),
-        params: rule
-            .attribute
-            .iter()
-            .map(|attribute| DocParam::Arg {
-                name: attribute.name.clone(),
-                docs: attribute
-                    .documentation
-                    .as_ref()
-                    .and_then(|doc| create_docstring(doc)),
-                typ: Ty::any(),
-                default_value: None,
-            })
-            .collect(),
+        params: DocParams {
+            named_only: rule
+                .attribute
+                .iter()
+                .map(|attribute| DocParam {
+                    name: attribute.name.clone(),
+                    docs: attribute
+                        .documentation
+                        .as_ref()
+                        .and_then(|doc| create_docstring(doc)),
+                    typ: Ty::any(),
+                    default_value: None,
+                })
+                .collect(),
+            ..Default::default()
+        },
         ..Default::default()
     })
 }
@@ -102,22 +101,46 @@ fn value_to_doc_member(value: &Value) -> DocMember {
     let docs = create_docstring(&value.doc);
 
     if let Some(callable) = &value.callable {
+        let mut params = DocParams {
+            ..Default::default()
+        };
+
+        for param in callable.param.iter() {
+            let name = if param.is_star_arg {
+                param.name.strip_prefix('*').unwrap_or(&param.name)
+            } else if param.is_star_star_arg {
+                param.name.strip_prefix("**").unwrap_or(&param.name)
+            } else {
+                &param.name
+            }
+            .to_string();
+
+            let doc_param = DocParam {
+                name,
+                docs: create_docstring(&param.doc),
+                typ: Ty::any(),
+                default_value: if param.is_mandatory {
+                    None
+                } else {
+                    Some(param.default_value.clone())
+                },
+            };
+
+            if param.is_star_arg {
+                params.args = Some(doc_param);
+            } else if param.is_star_star_arg {
+                params.kwargs = Some(doc_param);
+            } else {
+                // Most of bazel builtins have positional only parameters, but this information is
+                // not available in proto, to err on safe side adding all params to positional or
+                // named.
+                params.pos_or_named.push(doc_param);
+            }
+        }
+
         DocMember::Function(DocFunction {
             docs,
-            params: callable
-                .param
-                .iter()
-                .map(|param| DocParam::Arg {
-                    name: param.name.clone(),
-                    docs: create_docstring(&param.doc),
-                    typ: Ty::any(),
-                    default_value: if param.is_mandatory {
-                        None
-                    } else {
-                        Some(param.default_value.clone())
-                    },
-                })
-                .collect(),
+            params,
             ..Default::default()
         })
     } else {
