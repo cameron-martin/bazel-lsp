@@ -1103,28 +1103,85 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_environment_function_arguments() -> anyhow::Result<()> {
-        let fixture = TestFixture::new("simple")?;
-        let context = fixture.context()?;
+    fn get_function_doc(file_path: &str, function_name: &str) -> DocFunction {
+        let fixture = TestFixture::new("simple").unwrap();
+        let context = fixture.context().unwrap();
 
-        let module = context.get_environment(&LspUrl::File(PathBuf::from("/foo/bar/BUILD")));
+        let module = context.get_environment(&LspUrl::File(PathBuf::from(file_path)));
 
-        fn doc_function<'a>(module: &'a DocModule, func_name: &str) -> &'a DocFunction {
-            let (_, glob_member) = module
-                .members
-                .iter()
-                .find(|(member, _)| *member == func_name)
-                .unwrap();
+        let (_, function) = module
+            .members
+            .iter()
+            .find(|(member, _)| *member == function_name)
+            .unwrap();
 
-            match glob_member {
-                DocItem::Member(DocMember::Function(f)) => f,
-                _ => panic!(),
-            }
+        match function {
+            DocItem::Member(DocMember::Function(f)) => f.clone(),
+            _ => panic!(),
         }
+    }
+
+    #[test]
+    fn test_function_doc_code_block() -> anyhow::Result<()> {
+        let doc = get_function_doc("/foo/bar/sample.bzl", "hasattr");
 
         assert_eq!(
-            doc_function(&module, "glob").params.pos_or_named,
+            doc.docs.clone().unwrap().summary,
+            "Returns True if the object `x` has an attribute or method of the given `name`, otherwise False. Example:  \n```python\nhasattr(ctx.attr, \"myattr\")\n```"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_function_doc_links() -> anyhow::Result<()> {
+        // select doc contains both page relative links (#) and absolute links (/).
+        let select_doc = get_function_doc("sample.bzl", "select");
+        assert_eq!(
+            select_doc.docs.clone().unwrap().summary,
+            "`select()` is the helper function that makes a rule attribute configurable. See [build encyclopedia](https://bazel.build/reference/be/functions#select) for details."
+        );
+
+        assert_eq!(
+            select_doc.params.pos_or_named,
+            vec![
+                DocParam {
+                    name: "x".into(),
+                    default_value: None,
+                    docs: Some(DocString {
+                      summary: "A dict that maps configuration conditions to values. Each key is a [Label](https://bazel.build/rules/lib/builtins/Label.html) or a label string that identifies a config\\_setting or constraint\\_value instance. See the [documentation on macros](https://bazel.build/rules/macros#label-resolution) for when to use a Label instead of a string.".into(),
+                        details: None,
+                    }),
+                    typ: Ty::any(),
+                },
+                DocParam {
+                    name: "no_match_error".into(),
+                    default_value: Some("''".into()),
+                    docs: Some(DocString {
+                        summary: "Optional custom error to report if no condition matches.".into(),
+                        details: None,
+                    }),
+                    typ: Ty::any(),
+                },
+            ]
+        );
+
+        // aspect contains absolute link.
+        let aspect_doc = get_function_doc("sample.bzl", "aspect");
+        assert_eq!(
+            aspect_doc.docs.clone().unwrap().summary,
+            "Creates a new aspect. The result of this function must be stored in a global value. Please see the [introduction to Aspects](https://bazel.build/rules/aspects) for more details."
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_function_doc_params() -> anyhow::Result<()> {
+        let glob_doc = get_function_doc("/foo/bar/BUILD", "glob");
+
+        assert_eq!(
+            glob_doc.params.pos_or_named,
             vec![
                 DocParam {
                     name: "include".into(),
@@ -1166,8 +1223,13 @@ mod tests {
             ]
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_function_doc_args_kwargs() -> anyhow::Result<()> {
         assert_eq!(
-            doc_function(&module, "max").params.args,
+            get_function_doc("BUILD", "max").params.args,
             Some(DocParam {
                 name: "args".into(),
                 default_value: None,
@@ -1180,7 +1242,7 @@ mod tests {
         );
 
         assert_eq!(
-            doc_function(&module, "dict").params.kwargs,
+            get_function_doc("BUILD", "dict").params.kwargs,
             Some(DocParam {
                 name: "kwargs".into(),
                 default_value: None,
