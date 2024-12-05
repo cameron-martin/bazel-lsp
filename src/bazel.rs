@@ -36,9 +36,6 @@ use prost::Message;
 use starlark::analysis::find_call_name::AstModuleFindCallName;
 use starlark::analysis::AstModuleLint;
 use starlark::collections::SmallMap;
-use starlark::docs::get_registered_starlark_docs;
-use starlark::docs::render_docs_as_code;
-use starlark::docs::Doc;
 use starlark::docs::DocItem;
 use starlark::docs::DocModule;
 use starlark::errors::EvalMessage;
@@ -132,8 +129,6 @@ struct FilesystemCompletionOptions {
 pub(crate) struct BazelContext<Client> {
     workspaces: RefCell<HashMap<PathBuf, Rc<BazelWorkspace>>>,
     query_output_base: Option<PathBuf>,
-    pub(crate) builtin_docs: HashMap<LspUrl, String>,
-    pub(crate) builtin_symbols: HashMap<String, LspUrl>,
     pub(crate) client: Client,
 }
 
@@ -150,36 +145,11 @@ fn is_workspace_file(uri: &LspUrl) -> bool {
 
 impl<Client: BazelClient> BazelContext<Client> {
     pub(crate) fn new(client: Client, query_output_base: Option<PathBuf>) -> anyhow::Result<Self> {
-        let mut builtins: HashMap<LspUrl, Vec<Doc>> = HashMap::new();
-        let mut builtin_symbols: HashMap<String, LspUrl> = HashMap::new();
-        for doc in get_registered_starlark_docs() {
-            let uri = Self::url_for_doc(&doc);
-            builtin_symbols.insert(doc.id.name.clone(), uri.clone());
-            builtins.entry(uri).or_default().push(doc);
-        }
-        let builtin_docs = builtins
-            .into_iter()
-            .map(|(u, ds)| (u, render_docs_as_code(&ds)))
-            .collect();
-
         Ok(Self {
             workspaces: RefCell::new(HashMap::new()),
             query_output_base,
-            builtin_docs,
-            builtin_symbols,
             client,
         })
-    }
-
-    fn url_for_doc(doc: &Doc) -> LspUrl {
-        let url = match &doc.item {
-            DocItem::Module(_) => Url::parse("starlark:/native/builtins.bzl").unwrap(),
-            DocItem::Type(_) => {
-                Url::parse(&format!("starlark:/native/builtins/{}.bzl", doc.id.name)).unwrap()
-            }
-            DocItem::Member(_) => Url::parse("starlark:/native/builtins.bzl").unwrap(),
-        };
-        LspUrl::try_from(url).unwrap()
     }
 
     fn lint_module(&self, uri: &LspUrl, ast: &AstModule) -> Vec<EvalMessage> {
@@ -676,7 +646,7 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
                 },
                 false => Err(ContextError::NotAbsolute(uri.clone()).into()),
             },
-            LspUrl::Starlark(_) => Ok(self.builtin_docs.get(uri).cloned()),
+            LspUrl::Starlark(_) => Ok(None),
             _ => Err(ContextError::WrongScheme("file://".to_owned(), uri.clone()).into()),
         }
     }
@@ -688,9 +658,9 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
     fn get_url_for_global_symbol(
         &self,
         _current_file: &LspUrl,
-        symbol: &str,
+        _symbol: &str,
     ) -> anyhow::Result<Option<LspUrl>> {
-        Ok(self.builtin_symbols.get(symbol).cloned())
+        Ok(None)
     }
 
     fn get_string_completion_options(
@@ -812,7 +782,7 @@ mod tests {
     use lsp_types::CompletionItemKind;
     use serde_json::json;
     use starlark::{
-        docs::{DocItem, DocMember, DocModule, DocParam, DocString},
+        docs::{DocFunction, DocItem, DocMember, DocModule, DocParam, DocString},
         typing::Ty,
     };
     use starlark_lsp::{
@@ -1133,28 +1103,87 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_environment_function_arguments() -> anyhow::Result<()> {
-        let fixture = TestFixture::new("simple")?;
-        let context = fixture.context()?;
+    fn get_function_doc(file_path: &str, function_name: &str) -> DocFunction {
+        let fixture = TestFixture::new("simple").unwrap();
+        let context = fixture.context().unwrap();
 
-        let module = context.get_environment(&LspUrl::File(PathBuf::from("/foo/bar/BUILD")));
+        let module = context.get_environment(&LspUrl::File(PathBuf::from(file_path)));
 
-        let (_, glob_member) = module
+        let (_, function) = module
             .members
             .iter()
-            .find(|(member, _)| *member == "glob")
+            .find(|(member, _)| *member == function_name)
             .unwrap();
 
-        let f = match glob_member {
-            DocItem::Member(DocMember::Function(f)) => f,
+        match function {
+            DocItem::Member(DocMember::Function(f)) => f.clone(),
             _ => panic!(),
-        };
+        }
+    }
+
+    #[test]
+    fn test_function_doc_code_block() -> anyhow::Result<()> {
+        let doc = get_function_doc("/foo/bar/sample.bzl", "hasattr");
 
         assert_eq!(
-            *f.params,
+            doc.docs.clone().unwrap().summary,
+            "Returns True if the object `x` has an attribute or method of the given `name`, otherwise False. Example:  \n```python\nhasattr(ctx.attr, \"myattr\")\n```"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_function_doc_links() -> anyhow::Result<()> {
+        // select doc contains both page relative links (#) and absolute links (/).
+        let select_doc = get_function_doc("sample.bzl", "select");
+        assert_eq!(
+            select_doc.docs.clone().unwrap().summary,
+            "`select()` is the helper function that makes a rule attribute configurable. See [build encyclopedia](https://bazel.build/reference/be/functions#select) for details."
+        );
+
+        assert_eq!(
+            select_doc.params.pos_or_named,
             vec![
-                DocParam::Arg {
+                DocParam {
+                    name: "x".into(),
+                    default_value: None,
+                    docs: Some(DocString {
+                      summary: "A dict that maps configuration conditions to values. Each key is a [Label](https://bazel.build/rules/lib/builtins/Label.html) or a label string that identifies a config\\_setting or constraint\\_value instance. See the [documentation on macros](https://bazel.build/rules/macros#label-resolution) for when to use a Label instead of a string.".into(),
+                        details: None,
+                    }),
+                    typ: Ty::any(),
+                },
+                DocParam {
+                    name: "no_match_error".into(),
+                    default_value: Some("''".into()),
+                    docs: Some(DocString {
+                        summary: "Optional custom error to report if no condition matches.".into(),
+                        details: None,
+                    }),
+                    typ: Ty::any(),
+                },
+            ]
+        );
+
+        // aspect contains absolute link.
+        let aspect_doc = get_function_doc("sample.bzl", "aspect");
+        assert_eq!(
+            aspect_doc.docs.clone().unwrap().summary,
+            "Creates a new aspect. The result of this function must be stored in a global value. Please see the [introduction to Aspects](https://bazel.build/rules/aspects) for more details."
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_function_doc_params() -> anyhow::Result<()> {
+        let glob_doc = get_function_doc("/foo/bar/BUILD", "glob");
+
+        assert_eq!(
+            glob_doc.params.pos_or_named,
+            vec![
+                DocParam {
                     name: "include".into(),
                     default_value: Some("[]".into()),
                     docs: Some(DocString {
@@ -1163,7 +1192,7 @@ mod tests {
                     }),
                     typ: Ty::any(),
                 },
-                DocParam::Arg {
+                DocParam {
                     name: "exclude".into(),
                     default_value: Some("[]".into()),
                     docs: Some(DocString {
@@ -1172,7 +1201,7 @@ mod tests {
                     }),
                     typ: Ty::any(),
                 },
-                DocParam::Arg {
+                DocParam {
                     name: "exclude_directories".into(),
                     default_value: Some("1".into()),
                     docs: Some(DocString {
@@ -1181,7 +1210,7 @@ mod tests {
                     }),
                     typ: Ty::any(),
                 },
-                DocParam::Arg {
+                DocParam {
                     name: "allow_empty".into(),
                     // TODO: Fix this
                     default_value: Some("unbound".into()),
@@ -1192,6 +1221,37 @@ mod tests {
                     typ: Ty::any(),
                 },
             ]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_function_doc_args_kwargs() -> anyhow::Result<()> {
+        assert_eq!(
+            get_function_doc("BUILD", "max").params.args,
+            Some(DocParam {
+                name: "args".into(),
+                default_value: None,
+                docs: Some(DocString {
+                    summary: "The elements to be checked.".into(),
+                    details: None,
+                }),
+                typ: Ty::any(),
+            })
+        );
+
+        assert_eq!(
+            get_function_doc("BUILD", "dict").params.kwargs,
+            Some(DocParam {
+                name: "kwargs".into(),
+                default_value: None,
+                docs: Some(DocString {
+                    summary: "Dictionary of additional entries.".into(),
+                    details: None,
+                }),
+                typ: Ty::any(),
+            })
         );
 
         Ok(())
@@ -1231,7 +1291,7 @@ mod tests {
             match member {
                 DocMember::Function(function) => {
                     validate_doc_string(function.docs.as_ref());
-                    for param in &function.params {
+                    for param in &function.params.pos_or_named {
                         validate_doc_string(param.get_doc_string());
                     }
                 }
