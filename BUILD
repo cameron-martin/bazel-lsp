@@ -8,6 +8,10 @@ rust_binary(
         "//src/builtin:default_build_language.pb",
     ],
     rustc_env_files = [":generate_rustc_env_file"],
+    rustc_env = {
+        "BUILTIN_PB" : "$(execpath //src/builtin:builtin.pb)",
+        "DEFAULT_BUILD_LANGUAGE_PB" : "$(execpath //src/builtin:default_build_language.pb)",
+    },
     deps = [
         "//src/builtin:build_proto_rust",
         "//src/builtin:builtin_proto_rust",
