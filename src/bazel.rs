@@ -473,13 +473,13 @@ impl<Client: BazelClient> BazelContext<Client> {
 
         let language_proto = language_proto
             .as_deref()
-            .unwrap_or(include_bytes!("builtin/default_build_language.pb"));
+            .unwrap_or(include_bytes!(env!("DEFAULT_BUILD_LANGUAGE_PB")));
 
         let language = builtin::BuildLanguage::decode(&language_proto[..]).unwrap();
 
         // TODO: builtins are also dependent on bazel version, but there is no way to obtain those,
         // see https://github.com/bazel-contrib/vscode-bazel/issues/1.
-        let builtins_proto = include_bytes!("builtin/builtin.pb");
+        let builtins_proto = include_bytes!(env!("BUILTIN_PB"));
         let builtins = builtin::Builtins::decode(&builtins_proto[..]).unwrap();
 
         (language, builtins)
