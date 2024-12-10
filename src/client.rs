@@ -40,18 +40,47 @@ impl BazelCli {
             bazel: bazel.as_ref().to_owned(),
         }
     }
+
+    fn execute_bazel(
+        &self,
+        output_base: Option<&Path>,
+        workspace_root: &Path,
+        args: &[&str],
+    ) -> anyhow::Result<std::process::Output> {
+        let mut command = &mut Command::new(&self.bazel);
+        if let Some(output_base) = output_base {
+            command = command.arg("--output_base").arg(output_base);
+        }
+        command = command.args(args).current_dir(&workspace_root);
+
+        let output = command.output()?;
+
+        if !output.status.success() {
+            eprintln!("Command `{:?}` failed: {:?}", command, output);
+            Err(anyhow!("Command `bazel {}` failed", args.join(" ")))
+        } else {
+            Ok(output)
+        }
+    }
+
+    fn execute_bazel_get_stdout(
+        &self,
+        workspace: &BazelWorkspace,
+        args: &[&str],
+    ) -> anyhow::Result<Vec<u8>> {
+        let output = self.execute_bazel(
+            workspace.query_output_base.as_deref(),
+            &workspace.root,
+            args,
+        )?;
+
+        Ok(output.stdout)
+    }
 }
 
 impl BazelClient for BazelCli {
     fn info(&self, workspace_root: &Path) -> anyhow::Result<BazelInfo> {
-        let output = Command::new(&self.bazel)
-            .arg("info")
-            .current_dir(workspace_root)
-            .output()?;
-
-        if !output.status.success() {
-            return Err(anyhow!("Command `bazel info` failed"));
-        }
+        let output = self.execute_bazel(None, workspace_root, &["info"])?;
 
         let output = String::from_utf8(output.stdout)?;
         let mut execution_root = None;
@@ -86,56 +115,22 @@ impl BazelClient for BazelCli {
         workspace: &BazelWorkspace,
         repo: &str,
     ) -> anyhow::Result<HashMap<String, String>> {
-        let mut command = &mut Command::new(&self.bazel);
-        if let Some(output_base) = &workspace.query_output_base {
-            command = command.arg("--output_base").arg(output_base);
-        }
-        command = command
-            .args(["mod", "dump_repo_mapping"])
-            .arg(repo)
-            .current_dir(&workspace.root);
+        let stdout =
+            self.execute_bazel_get_stdout(workspace, &["mod", "dump_repo_mapping", repo])?;
 
-        let output = command.output()?;
-
-        if !output.status.success() {
-            return Err(anyhow!("Command `bazel mod dump_repo_mapping` failed"));
-        }
-
-        Ok(serde_json::from_slice(&output.stdout)?)
+        Ok(serde_json::from_slice(&stdout)?)
     }
 
     fn query(&self, workspace: &BazelWorkspace, query: &str) -> anyhow::Result<String> {
-        let mut command = &mut Command::new(&self.bazel);
-        if let Some(output_base) = &workspace.query_output_base {
-            command = command.arg("--output_base").arg(output_base);
-        }
-        command = command.arg("query").arg(query);
-        command = command.current_dir(&workspace.root);
-        let output = command.output()?;
+        let stdout = self.execute_bazel_get_stdout(workspace, &["query", query])?;
 
-        if !output.status.success() {
-            return Err(anyhow::anyhow!("Command `bazel query` failed"));
-        }
-
-        Ok(String::from_utf8(output.stdout)?)
+        Ok(String::from_utf8(stdout)?)
     }
 
     fn build_language(&self, workspace: &BazelWorkspace) -> anyhow::Result<Vec<u8>> {
-        let mut command = &mut Command::new(&self.bazel);
-        if let Some(output_base) = &workspace.query_output_base {
-            command = command.arg("--output_base").arg(output_base);
-        }
-        command = command.arg("info").arg("build-language");
-        command = command.current_dir(&workspace.root);
-        let output = command.output()?;
+        let stdout = self.execute_bazel_get_stdout(workspace, &["info", "build-language"])?;
 
-        if !output.status.success() {
-            return Err(anyhow::anyhow!(
-                "Command `bazel info build-language` failed"
-            ));
-        }
-
-        Ok(output.stdout)
+        Ok(stdout)
     }
 }
 
