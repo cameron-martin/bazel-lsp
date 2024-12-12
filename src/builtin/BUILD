@@ -1,4 +1,4 @@
-load("@rules_rust//proto/prost:defs.bzl", "rust_prost_library")
+load("@rules_rust_prost//:defs.bzl", "rust_prost_library")
 
 rust_prost_library(
     name = "build_proto_rust",
