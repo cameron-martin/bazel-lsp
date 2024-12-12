@@ -1,9 +1,10 @@
-bazel_dep(name = "rules_rust", version = "0.54.1")
+bazel_dep(name = "rules_rust", version = "0.55.6")
+bazel_dep(name = "rules_rust_prost", version = "0.55.6")
 
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 rust.toolchain(
     edition = "2021",
-    versions = ["1.80.0"],
+    versions = ["1.83.0"],
 )
 use_repo(rust, "rust_toolchains")
 register_toolchains("@rust_toolchains//:all")
@@ -15,6 +16,7 @@ use_repo(rust_host_tools, "rust_host_tools")
 crate = use_extension(
     "@rules_rust//crate_universe:extension.bzl",
     "crate",
+    isolate=True
 )
 crate.from_cargo(
     name = "crates",
@@ -39,7 +41,7 @@ bazel_dep(
     dev_dependency = True,
 )
 
-bazel_dep(name = "protobuf", version = "27.1")
+bazel_dep(name = "protobuf", version = "28.3")
 
 register_toolchains("//prost:prost_toolchain")
 
