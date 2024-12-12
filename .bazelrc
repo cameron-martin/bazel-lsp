@@ -21,6 +21,8 @@ build:ci --remote_cache=grpcs://bazel-lsp.buildbuddy.io
 build:ci --remote_timeout=3600
 build:ci --build_metadata=VISIBILITY=PUBLIC
 
+common:ci --lockfile_mode=error
+
 # Configuration required by https://github.com/uber/hermetic_cc_toolchain
 build:linux --sandbox_add_mount_pair=/tmp
 # Disable auto-detected local C++ toolchain, always use hermetic toolchains.
