@@ -22,7 +22,6 @@ rust_binary(
         "@crates//:hex",
         "@crates//:htmd",
         "@crates//:lsp-types",
-        "@crates//:once_cell",
         "@crates//:ring",
         "@crates//:serde_json",
         "@crates//:starlark",

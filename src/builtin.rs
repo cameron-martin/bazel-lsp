@@ -1,7 +1,8 @@
+use std::sync::LazyLock;
+
 pub use build_proto::blaze_query::*;
 pub use builtin_proto::builtin::*;
 use htmd::{Element, HtmlToMarkdown};
-use once_cell::sync::Lazy;
 use starlark::{
     docs::{DocFunction, DocMember, DocParam, DocParams, DocProperty, DocString},
     typing::Ty,
@@ -48,7 +49,7 @@ pub static MISSING_GLOBALS: &'static [&'static str] = &[
     "distribs",
 ];
 
-static HTML_CONVERTER: Lazy<htmd::HtmlToMarkdown> = Lazy::new(|| {
+static HTML_CONVERTER: LazyLock<htmd::HtmlToMarkdown> = LazyLock::new(|| {
     HtmlToMarkdown::builder()
         .add_handler(vec!["pre"], |element: Element| {
             for attr in element.attrs {
