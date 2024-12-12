@@ -10,5 +10,10 @@
   ],
   "ignorePaths": [
     "fixtures/"
+  ],
+  "packageRules": [
+    {
+      "matchPackageNames": ["protoc-gen-*"]
+    }
   ]
 }
