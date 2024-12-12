@@ -20,6 +20,7 @@ rust_binary(
         "@crates//:prost",
         "@crates//:either",
         "@crates//:hex",
+        "@crates//:htmd",
         "@crates//:lsp-types",
         "@crates//:ring",
         "@crates//:serde_json",

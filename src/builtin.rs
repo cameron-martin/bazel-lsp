@@ -1,5 +1,8 @@
+use std::sync::LazyLock;
+
 pub use build_proto::blaze_query::*;
 pub use builtin_proto::builtin::*;
+use htmd::{Element, HtmlToMarkdown};
 use starlark::{
     docs::{DocFunction, DocMember, DocParam, DocParams, DocProperty, DocString},
     typing::Ty,
@@ -45,6 +48,45 @@ pub static MISSING_GLOBALS: &'static [&'static str] = &[
     // Removed in https://github.com/bazelbuild/bazel/commit/5ade9da5de25bc93d0ec79faea8f08a54e5b9a68
     "distribs",
 ];
+
+static HTML_CONVERTER: LazyLock<htmd::HtmlToMarkdown> = LazyLock::new(|| {
+    HtmlToMarkdown::builder()
+        .add_handler(vec!["pre"], |element: Element| {
+            for attr in element.attrs {
+                if &attr.name.local == "class" && attr.value.to_string() == "language-python" {
+                    return Some(format!("\n```python\n{}\n```\n", element.content));
+                }
+            }
+            Some(element.content.to_string())
+        })
+        .add_handler(vec!["a"], |element: Element| {
+            for attr in element.attrs {
+                if &attr.name.local == "href" {
+                    // For local links, just remove link altogether.
+                    if attr.value.starts_with("#") {
+                        return Some(element.content.to_string());
+                    }
+
+                    // For relative links, guess the page it points to.
+                    let link = if attr.value.starts_with("/") {
+                        format!("https://bazel.build{}", attr.value.to_string())
+                    } else if attr.value.starts_with("../") {
+                        format!(
+                            "https://bazel.build/rules/lib/{}",
+                            attr.value.strip_prefix("../").unwrap()
+                        )
+                    } else {
+                        // For absolute links, just use the link.
+                        attr.value.to_string()
+                    };
+
+                    return Some(format!("[{}]({})", element.content.to_string(), link));
+                }
+            }
+            Some(element.content.to_string())
+        })
+        .build()
+});
 
 pub fn build_language_to_doc_members<'a>(
     build_language: &'a BuildLanguage,
@@ -98,7 +140,7 @@ pub fn builtins_to_doc_members<'a>(
 }
 
 fn value_to_doc_member(value: &Value) -> DocMember {
-    let docs = create_docstring(&value.doc);
+    let docs = create_docstring_for_possible_html(&value.doc);
 
     if let Some(callable) = &value.callable {
         let mut params = DocParams {
@@ -117,7 +159,7 @@ fn value_to_doc_member(value: &Value) -> DocMember {
 
             let doc_param = DocParam {
                 name,
-                docs: create_docstring(&param.doc),
+                docs: create_docstring_for_possible_html(&param.doc),
                 typ: Ty::any(),
                 default_value: if param.is_mandatory {
                     None
@@ -162,4 +204,19 @@ fn create_docstring(summary: &str) -> Option<DocString> {
             details: None,
         })
     }
+}
+
+fn create_docstring_for_possible_html(html: &str) -> Option<DocString> {
+    // Some documentation is using markdown, use simple heuristic to check whether need to convert
+    // from html to markdown.
+    let markdown = if str::contains(html, "<") {
+        match HTML_CONVERTER.convert(html).ok() {
+            Some(markdown) => markdown,
+            None => html.to_string(),
+        }
+    } else {
+        html.to_string()
+    };
+
+    create_docstring(&markdown)
 }
