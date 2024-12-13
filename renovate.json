@@ -13,7 +13,8 @@
   ],
   "packageRules": [
     {
-      "matchPackageNames": ["protoc-gen-*"]
+      "matchSourceUrls": ["https://github.com/neoeinstein/protoc-gen-prost"],
+      "groupName": "protoc-gen crates"
     }
   ]
 }
