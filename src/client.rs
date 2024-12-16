@@ -1,5 +1,4 @@
 use std::{
-    cell::RefCell,
     collections::HashMap,
     path::{Path, PathBuf},
     process::Command,
@@ -135,6 +134,7 @@ impl BazelClient for BazelCli {
 }
 
 #[derive(Default)]
+#[cfg(test)]
 pub struct Profile {
     pub info: u16,
     pub dump_repo_mapping: u16,
@@ -144,11 +144,13 @@ pub struct Profile {
 
 /// A wrapper client that records the number of invocations to the inner client.
 /// Used for testing that bazel isn't being called too many times, for example in a loop.
+#[cfg(test)]
 pub struct ProfilingClient<InnerClient> {
     inner: InnerClient,
-    pub profile: RefCell<Profile>,
+    pub profile: std::cell::RefCell<Profile>,
 }
 
+#[cfg(test)]
 impl<InnerClient> ProfilingClient<InnerClient> {
     pub fn new(inner: InnerClient) -> Self {
         Self {
@@ -158,6 +160,7 @@ impl<InnerClient> ProfilingClient<InnerClient> {
     }
 }
 
+#[cfg(test)]
 impl<InnerClient: BazelClient> BazelClient for ProfilingClient<InnerClient> {
     fn info(&self, workspace_root: &Path) -> anyhow::Result<BazelInfo> {
         self.profile.borrow_mut().info += 1;
