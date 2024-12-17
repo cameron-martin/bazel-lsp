@@ -1,4 +1,4 @@
-bazel_dep(name = "rules_rust", version = "0.55.6")
+bazel_dep(name = "rules_rust", version = "0.56.0")
 bazel_dep(name = "rules_rust_prost", version = "0.55.6")
 
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
