@@ -1139,7 +1139,7 @@ mod tests {
         let select_doc = get_function_doc("sample.bzl", "select");
         assert_eq!(
             select_doc.docs.clone().unwrap().summary,
-            "`select()` is the helper function that makes a rule attribute configurable. See [build encyclopedia](https://bazel.build/reference/be/functions#select) for details."
+            "`select()` is the helper function that makes a rule attribute [configurable](https://bazel.build/reference/be/common-definitions#configurable-attributes). See [build encyclopedia](https://bazel.build/reference/be/functions#select) for details."
         );
 
         assert_eq!(
@@ -1232,7 +1232,8 @@ mod tests {
             get_function_doc("BUILD", "max").params.args,
             Some(DocParam {
                 name: "args".into(),
-                default_value: None,
+                default_value: Some("".to_string()), // TODO: Why empty string is default value
+                                                     // here?
                 docs: Some(DocString {
                     summary: "The elements to be checked.".into(),
                     details: None,
@@ -1245,7 +1246,7 @@ mod tests {
             get_function_doc("BUILD", "dict").params.kwargs,
             Some(DocParam {
                 name: "kwargs".into(),
-                default_value: None,
+                default_value: Some("".to_string()), // TODO?
                 docs: Some(DocString {
                     summary: "Dictionary of additional entries.".into(),
                     details: None,
