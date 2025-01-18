@@ -1,6 +1,12 @@
 # Enable platform configs below, like build:linux, test:windows etc.
 common --enable_platform_specific_config
 
+# Print full command line if action fails.
+build --verbose_failures
+
+# Print output of failed tests.
+test --test_output=errors
+
 # To update these lines, execute
 # `bazel run @rules_bazel_integration_test//tools:update_deleted_packages`
 build --deleted_packages=fixtures/bzlmod/root,fixtures/simple/output_base/external/bar,fixtures/simple/output_base/external/foo,fixtures/simple/root,fixtures/simple/root/foo
