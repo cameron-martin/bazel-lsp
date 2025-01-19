@@ -1,4 +1,5 @@
 load("@rules_rust_prost//:defs.bzl", "rust_prost_library")
+load(":pbtxt_to_pb.bzl", "pbtxt_to_pb")
 
 rust_prost_library(
     name = "build_proto_rust",
@@ -14,22 +15,12 @@ rust_prost_library(
 
 # The pbtxt file can be obtained from bazel instance:
 # bazel info build-language | protoc --decode=blaze_query.BuildLanguage --proto_path <BAZEL_REPO> src/main/protobuf/build.proto > default_build_language.pbtxt
-genrule(
-    name = "default_build_language_pbtxt_to_pb",
-    srcs = [
-        ":default_build_language.pbtxt",
-    ],
-    outs = ["default_build_language.pb"],
-    tools = [
-        "@protobuf//:protoc",
-        "@bazel_tools//src/main/protobuf:build_proto",
-    ],
-    cmd = "cat $(execpath :default_build_language.pbtxt) | " +
-        "$(execpath @protobuf//:protoc) " +
-        "--encode=blaze_query.BuildLanguage " +
-        "--deterministic_output " +
-        "--descriptor_set_in=$(execpath @bazel_tools//src/main/protobuf:build_proto) " +
-        "> $@",
+pbtxt_to_pb(
+    name = "default_build_language",
+    message_proto_library = "@bazel_tools//src/main/protobuf:build_proto",
+    message_type = "blaze_query.BuildLanguage",
+    pb = "default_build_language.pb",
+    pbtxt = "default_build_language.pbtxt",
     visibility = ["//visibility:public"],
 )
 
@@ -37,21 +28,11 @@ genrule(
 #
 # bazel build src/main/java/com/google/devtools/build/lib:gen_api_proto
 # cat bazel-bin/src/main/java/com/google/devtools/build/lib/builtin.pb | protoc --decode=builtin.Builtins --proto_path src/main/protobuf builtin.proto > builtin.pbtxt
-genrule(
-    name = "builtin_pbtxt_to_pb",
-    srcs = [
-        ":builtin.pbtxt",
-    ],
-    outs = ["builtin.pb"],
-    tools = [
-        "@protobuf//:protoc",
-        "@bazel_tools//src/main/protobuf:builtin_proto",
-    ],
-    cmd = "cat $(execpath :builtin.pbtxt) | " +
-        "$(execpath @protobuf//:protoc) " +
-        "--encode=builtin.Builtins " +
-        "--deterministic_output " +
-        "--descriptor_set_in=$(execpath @bazel_tools//src/main/protobuf:builtin_proto) " +
-        "> $@",
+pbtxt_to_pb(
+    name = "builtin",
+    message_proto_library = "@bazel_tools//src/main/protobuf:builtin_proto",
+    message_type = "builtin.Builtins",
+    pb = "builtin.pb",
+    pbtxt = "builtin.pbtxt",
     visibility = ["//visibility:public"],
 )
