@@ -1,3 +1,4 @@
 *.pbtxt linguist-generated
+*.lock linguist-generated
 Cargo.toml text eol=lf
 Cargo.lock text eol=lf
