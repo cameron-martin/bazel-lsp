@@ -10,45 +10,6 @@ use starlark::{
 
 use crate::file_type::FileType;
 
-/// Names of globals missing in builtins reported by bazel.
-/// See e.g. https://github.com/bazel-contrib/vscode-bazel/issues/1#issuecomment-2036369868
-pub static MISSING_GLOBALS: &'static [&'static str] = &[
-    // All values from https://bazel.build/rules/lib/globals/workspace
-    "bind",
-    "register_execution_platforms",
-    "register_toolchains",
-    "workspace",
-    // Values from https://bazel.build/rules/lib/globals/module
-    "archive_override",
-    "bazel_dep",
-    "git_override",
-    "include",
-    "inject_repo",
-    "local_path_override",
-    "module",
-    "multiple_version_override",
-    "override_repo",
-    "register_execution_platforms",
-    "register_toolchains",
-    "single_version_override",
-    "use_extension",
-    "use_repo",
-    "use_repo_rule",
-    // Missing values from https://bazel.build/rules/lib/globals/build
-    "package",
-    "repo_name",
-    // Missing values from https://bazel.build/rules/lib/globals/bzl
-    "exec_transition",
-    "module_extension",
-    "repository_rule",
-    "tag_class",
-    // Marked as not documented on https://github.com/bazelbuild/bazel/blob/master/src/main/java/com/google/devtools/build/lib/packages/BuildGlobals.java
-    "licenses",
-    "environment_group",
-    // Removed in https://github.com/bazelbuild/bazel/commit/5ade9da5de25bc93d0ec79faea8f08a54e5b9a68
-    "distribs",
-];
-
 static HTML_CONVERTER: LazyLock<htmd::HtmlToMarkdown> = LazyLock::new(|| {
     HtmlToMarkdown::builder()
         .add_handler(vec!["pre"], |element: Element| {
@@ -123,19 +84,25 @@ pub fn rule_to_doc_member(rule: &RuleDefinition) -> DocMember {
     })
 }
 
+pub fn api_context_applicable_for_file_type(
+    api_context: ApiContext,
+    file_type: FileType) -> bool {
+    match api_context {
+        ApiContext::All => true,
+        ApiContext::Bzl => file_type == FileType::Library,
+        ApiContext::Build => file_type == FileType::Build,
+        ApiContext::Module => file_type == FileType::Module,
+        ApiContext::Repo => file_type == FileType::Repo,
+        ApiContext::Vendor => file_type == FileType::Vendor,
+        ApiContext::Workspace => file_type == FileType::Workspace,
+    }
+}
+
 pub fn builtins_to_doc_members<'a>(
-    builtins: &'a Builtins,
-    file_type: FileType,
+    globals: &'a Vec<Value>,
 ) -> impl Iterator<Item = (String, DocMember)> + 'a {
-    builtins.global.iter().flat_map(move |global| {
-        if global.api_context == ApiContext::All as i32
-            || (global.api_context == ApiContext::Bzl as i32 && file_type == FileType::Library)
-            || (global.api_context == ApiContext::Build as i32 && file_type == FileType::Build)
-        {
-            Some((global.name.clone(), value_to_doc_member(global)))
-        } else {
-            None
-        }
+    globals.iter().flat_map(move |global| {
+        Some((global.name.clone(), value_to_doc_member(global)))
     })
 }
 
