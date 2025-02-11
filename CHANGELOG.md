@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.4](https://github.com/cameron-martin/bazel-lsp/compare/v0.6.3...v0.6.4) (2025-02-11)
+
+
+### Bug Fixes
+
+* convert html to markdown in docs ([#66](https://github.com/cameron-martin/bazel-lsp/issues/66)) ([bf9d1c7](https://github.com/cameron-martin/bazel-lsp/commit/bf9d1c7de268a0f75b50e94a297f6083e09fcf51))
+
 ## [0.6.3](https://github.com/cameron-martin/bazel-lsp/compare/v0.6.2...v0.6.3) (2024-11-27)
 
 
