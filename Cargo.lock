@@ -50,20 +50,20 @@ dependencies = [
 
 [[package]]
 name = "allocative"
-version = "0.3.3"
-source = "git+https://github.com/facebook/starlark-rust.git?branch=main#760df74a5af3e2ebb903949f74071df9dae62b95"
+version = "0.3.4"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#d955c5d507ea8c0ca80954085767cee5df7a8a07"
 dependencies = [
  "allocative_derive",
  "bumpalo",
  "ctor",
- "hashbrown 0.14.3",
+ "hashbrown 0.14.5",
  "num-bigint",
 ]
 
 [[package]]
 name = "allocative_derive"
 version = "0.3.3"
-source = "git+https://github.com/facebook/starlark-rust.git?branch=main#760df74a5af3e2ebb903949f74071df9dae62b95"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#d955c5d507ea8c0ca80954085767cee5df7a8a07"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -410,7 +410,7 @@ dependencies = [
 [[package]]
 name = "cmp_any"
 version = "0.8.1"
-source = "git+https://github.com/facebook/starlark-rust.git?branch=main#760df74a5af3e2ebb903949f74071df9dae62b95"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#d955c5d507ea8c0ca80954085767cee5df7a8a07"
 
 [[package]]
 name = "colorchoice"
@@ -532,7 +532,7 @@ dependencies = [
 [[package]]
 name = "display_container"
 version = "0.9.0"
-source = "git+https://github.com/facebook/starlark-rust.git?branch=main#760df74a5af3e2ebb903949f74071df9dae62b95"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#d955c5d507ea8c0ca80954085767cee5df7a8a07"
 dependencies = [
  "either",
  "indenter",
@@ -540,16 +540,16 @@ dependencies = [
 
 [[package]]
 name = "dupe"
-version = "0.9.0"
-source = "git+https://github.com/facebook/starlark-rust.git?branch=main#760df74a5af3e2ebb903949f74071df9dae62b95"
+version = "0.9.1"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#d955c5d507ea8c0ca80954085767cee5df7a8a07"
 dependencies = [
  "dupe_derive",
 ]
 
 [[package]]
 name = "dupe_derive"
-version = "0.9.0"
-source = "git+https://github.com/facebook/starlark-rust.git?branch=main#760df74a5af3e2ebb903949f74071df9dae62b95"
+version = "0.9.1"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#d955c5d507ea8c0ca80954085767cee5df7a8a07"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -748,9 +748,9 @@ checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
 
 [[package]]
 name = "hashbrown"
-version = "0.14.3"
+version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
+checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
 dependencies = [
  "ahash",
  "allocator-api2",
@@ -945,7 +945,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "168fb715dda47215e360912c096649d23d58bf392ac62f73919e831745e40f26"
 dependencies = [
  "equivalent",
- "hashbrown 0.14.3",
+ "hashbrown 0.14.5",
 ]
 
 [[package]]
@@ -1902,8 +1902,8 @@ checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
 
 [[package]]
 name = "starlark"
-version = "0.12.0"
-source = "git+https://github.com/facebook/starlark-rust.git?branch=main#760df74a5af3e2ebb903949f74071df9dae62b95"
+version = "0.13.0"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#d955c5d507ea8c0ca80954085767cee5df7a8a07"
 dependencies = [
  "allocative",
  "anyhow",
@@ -1916,7 +1916,7 @@ dependencies = [
  "dupe",
  "either",
  "erased-serde",
- "hashbrown 0.14.3",
+ "hashbrown 0.14.5",
  "inventory",
  "itertools 0.13.0",
  "maplit",
@@ -1941,8 +1941,8 @@ dependencies = [
 
 [[package]]
 name = "starlark_derive"
-version = "0.12.0"
-source = "git+https://github.com/facebook/starlark-rust.git?branch=main#760df74a5af3e2ebb903949f74071df9dae62b95"
+version = "0.13.0"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#d955c5d507ea8c0ca80954085767cee5df7a8a07"
 dependencies = [
  "dupe",
  "proc-macro2",
@@ -1952,8 +1952,8 @@ dependencies = [
 
 [[package]]
 name = "starlark_lsp"
-version = "0.12.0"
-source = "git+https://github.com/facebook/starlark-rust.git?branch=main#760df74a5af3e2ebb903949f74071df9dae62b95"
+version = "0.13.0"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#d955c5d507ea8c0ca80954085767cee5df7a8a07"
 dependencies = [
  "anyhow",
  "derivative",
@@ -1971,21 +1971,21 @@ dependencies = [
 
 [[package]]
 name = "starlark_map"
-version = "0.12.0"
-source = "git+https://github.com/facebook/starlark-rust.git?branch=main#760df74a5af3e2ebb903949f74071df9dae62b95"
+version = "0.13.0"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#d955c5d507ea8c0ca80954085767cee5df7a8a07"
 dependencies = [
  "allocative",
  "dupe",
  "equivalent",
  "fxhash",
- "hashbrown 0.14.3",
+ "hashbrown 0.14.5",
  "serde",
 ]
 
 [[package]]
 name = "starlark_syntax"
-version = "0.12.0"
-source = "git+https://github.com/facebook/starlark-rust.git?branch=main#760df74a5af3e2ebb903949f74071df9dae62b95"
+version = "0.13.0"
+source = "git+https://github.com/facebook/starlark-rust.git?branch=main#d955c5d507ea8c0ca80954085767cee5df7a8a07"
 dependencies = [
  "allocative",
  "annotate-snippets",
