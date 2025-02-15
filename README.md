@@ -31,3 +31,15 @@ Ensure you have the [Bazel extension](https://marketplace.visualstudio.com/items
 ```
 
 Restart vscode for this to take effect.
+
+### Logging
+
+Logging can be enabled using the `RUST_LOG` environment variable. For more info on the syntax of this environment variable, see the [`tracing_subscriber` docs](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html).
+
+This can be set in vscode by setting the `bazel.lsp.env` configuration option:
+
+```json
+{
+  "bazel.lsp.env": { "RUST_LOG": "info" },
+}
+```

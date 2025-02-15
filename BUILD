@@ -28,6 +28,8 @@ rust_binary(
         "@crates//:starlark_lsp",
         "@crates//:starlark_syntax",
         "@crates//:thiserror",
+        "@crates//:tracing",
+        "@crates//:tracing-subscriber",
     ],
 )
 

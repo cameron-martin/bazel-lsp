@@ -26,6 +26,8 @@ starlark_lsp = { git = "https://github.com/facebook/starlark-rust.git", branch =
 starlark_syntax = { git = "https://github.com/facebook/starlark-rust.git", branch = "main" }
 thiserror = "1.0.56"
 tonic = "0.12.0"
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 
 [patch.crates-io]
 # Release v1.1.13 of https://github.com/rust-lang/cc-rs/releases/tag/cc-v1.1.13

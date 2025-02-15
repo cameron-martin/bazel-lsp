@@ -29,6 +29,7 @@ pub(crate) trait BazelClient {
     fn build_language(&self, workspace: &BazelWorkspace) -> anyhow::Result<Vec<u8>>;
 }
 
+#[derive(Debug)]
 pub(crate) struct BazelCli {
     bazel: PathBuf,
 }
@@ -78,6 +79,7 @@ impl BazelCli {
 }
 
 impl BazelClient for BazelCli {
+    #[tracing::instrument]
     fn info(&self, workspace_root: &Path) -> anyhow::Result<BazelInfo> {
         let output = self.execute_bazel(None, workspace_root, &["info"])?;
 
@@ -109,6 +111,7 @@ impl BazelClient for BazelCli {
         })
     }
 
+    #[tracing::instrument]
     fn dump_repo_mapping(
         &self,
         workspace: &BazelWorkspace,
@@ -120,12 +123,14 @@ impl BazelClient for BazelCli {
         Ok(serde_json::from_slice(&stdout)?)
     }
 
+    #[tracing::instrument]
     fn query(&self, workspace: &BazelWorkspace, query: &str) -> anyhow::Result<String> {
         let stdout = self.execute_bazel_get_stdout(workspace, &["query", query])?;
 
         Ok(String::from_utf8(stdout)?)
     }
 
+    #[tracing::instrument]
     fn build_language(&self, workspace: &BazelWorkspace) -> anyhow::Result<Vec<u8>> {
         let stdout = self.execute_bazel_get_stdout(workspace, &["info", "build-language"])?;
 

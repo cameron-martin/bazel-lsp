@@ -7,11 +7,12 @@ mod label;
 pub mod test_fixture;
 mod workspace;
 
-use std::{env, path::PathBuf};
+use std::{env, io, path::PathBuf};
 
 use bazel::BazelContext;
 use clap::Parser;
 use client::BazelCli;
+use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -36,6 +37,13 @@ struct Args {
 }
 
 fn main() -> anyhow::Result<()> {
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .with_writer(io::stderr)
+        .with_ansi(false)
+        .with_span_events(FmtSpan::ENTER | FmtSpan::EXIT)
+        .init();
+
     let args = Args::parse();
 
     let query_output_base = if args.no_distinct_output_base {
@@ -47,10 +55,7 @@ fn main() -> anyhow::Result<()> {
         )
     };
 
-    let ctx = BazelContext::new(
-        BazelCli::new(args.bazel),
-        query_output_base,
-    )?;
+    let ctx = BazelContext::new(BazelCli::new(args.bazel), query_output_base)?;
 
     starlark_lsp::server::stdio_server(ctx)?;
 

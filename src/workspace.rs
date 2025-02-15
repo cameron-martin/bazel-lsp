@@ -9,6 +9,7 @@ use starlark_lsp::server::LspUrl;
 
 use crate::client::BazelInfo;
 
+#[derive(Debug)]
 pub struct BazelWorkspace {
     pub root: PathBuf,
     /// The output base to use for querying. This allows queries to not
