@@ -16,5 +16,11 @@
       "matchSourceUrls": ["https://github.com/neoeinstein/protoc-gen-prost"],
       "groupName": "protoc-gen crates"
     }
-  ]
+  ],
+  "postUpgradeTasks": {
+    "commands": [
+        "bazel mod deps"
+    ],
+    "executionMode": "branch"
+  }
 }
