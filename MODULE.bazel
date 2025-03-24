@@ -1,5 +1,5 @@
-bazel_dep(name = "rules_rust", version = "0.57.0")
-bazel_dep(name = "rules_rust_prost", version = "0.57.0")
+bazel_dep(name = "rules_rust", version = "0.59.2")
+bazel_dep(name = "rules_rust_prost", version = "0.59.2")
 
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 rust.toolchain(
@@ -37,15 +37,15 @@ crate.annotation(
 
 bazel_dep(
     name = "rules_bazel_integration_test",
-    version = "0.23.0",
+    version = "0.32.0",
     dev_dependency = True,
 )
 
-bazel_dep(name = "protobuf", version = "29.3")
+bazel_dep(name = "protobuf", version = "30.0")
 
 register_toolchains("//prost:prost_toolchain")
 
-bazel_dep(name = "hermetic_cc_toolchain", version = "3.1.1")
+bazel_dep(name = "hermetic_cc_toolchain", version = "3.2.0")
 
 zig_toolchains = use_extension("@hermetic_cc_toolchain//toolchain:ext.bzl", "toolchains")
 use_repo(zig_toolchains, "zig_sdk")
