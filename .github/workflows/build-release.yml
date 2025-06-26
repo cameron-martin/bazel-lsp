@@ -14,10 +14,10 @@ jobs:
       matrix:
         target:
           - name: linux-amd64
-            runs-on: ubuntu-20.04
+            runs-on: ubuntu-24.04
             extension: ""
           - name: linux-arm64
-            runs-on: ubuntu-22.04-arm
+            runs-on: ubuntu-24.04-arm
             extension: ""
           - name: windows-amd64
             runs-on: windows-2019
