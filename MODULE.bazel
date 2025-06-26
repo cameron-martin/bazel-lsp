@@ -48,7 +48,7 @@ bazel_dep(
     dev_dependency = True,
 )
 
-bazel_dep(name = "protobuf", version = "29.3")
+bazel_dep(name = "protobuf", version = "29.5")
 
 register_toolchains("//prost:prost_toolchain")
 
