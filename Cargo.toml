@@ -28,10 +28,3 @@ thiserror = "1.0.56"
 tonic = "0.12.0"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-
-[patch.crates-io]
-# Release v1.1.13 of https://github.com/rust-lang/cc-rs/releases/tag/cc-v1.1.13
-# patched with support for *-unknown-linux-gnu targets.
-# Patch://github.com/Asana/cc-rs/commit/3cd7c687771196bd2e5d36e5446bfcfa801c08ef
-# Zig bug: https://github.com/ziglang/zig/issues/4911
-cc = { git = "https://github.com/Asana/cc-rs.git", commit = "3cd7c687771196bd2e5d36e5446bfcfa801c08ef" }

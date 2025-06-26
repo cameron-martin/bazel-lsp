@@ -45,7 +45,11 @@ bazel_dep(name = "protobuf", version = "29.3")
 
 register_toolchains("//prost:prost_toolchain")
 
-bazel_dep(name = "hermetic_cc_toolchain", version = "3.1.1")
+bazel_dep(name = "hermetic_cc_toolchain", version = "4.0.1")
+
+# Workaround for rules_rust and zig target triple compatibility.
+# Pulled from this PR: https://github.com/uber/hermetic_cc_toolchain/pull/223
+single_version_override(module_name = "hermetic_cc_toolchain", patches = ["//bazel:hermetic_cc_toolchain.patch"], patch_strip = 1)
 
 zig_toolchains = use_extension("@hermetic_cc_toolchain//toolchain:ext.bzl", "toolchains")
 use_repo(zig_toolchains, "zig_sdk")
