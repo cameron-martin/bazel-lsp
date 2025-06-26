@@ -15,6 +15,10 @@
     {
       "matchSourceUrls": ["https://github.com/neoeinstein/protoc-gen-prost"],
       "groupName": "protoc-gen crates"
+    },
+    {
+      "matchSourceUrls": ["https://github.com/bazelbuild/rules_rust"],
+      "groupName": "rules_rust modules"
     }
   ]
 }
