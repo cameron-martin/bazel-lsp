@@ -25,6 +25,6 @@ starlark = { git = "https://github.com/facebook/starlark-rust.git", branch = "ma
 starlark_lsp = { git = "https://github.com/facebook/starlark-rust.git", branch = "main" }
 starlark_syntax = { git = "https://github.com/facebook/starlark-rust.git", branch = "main" }
 thiserror = "1.0.56"
-tonic = "0.12.0"
+tonic = "0.13.0"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
