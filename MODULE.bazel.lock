@@ -3896,7 +3896,7 @@
         "bzlTransitiveDigest": "COQRRb17FQr6MuuCZUhXtu8wrugTYtqLRgHhaKT+tn8=",
         "usagesDigest": "eR/1RcNuPvjQEYcVJLFE3bOXQHcPdOEfwU4iGa2lTws=",
         "recordedFileInputs": {
-          "@@//Cargo.toml": "8c319fc182dc599763b343c255665adf848e0cd24b50db963ce47b648c2dcb9a"
+          "@@//Cargo.toml": "afd26dd44d11aee95fc94fd2c696e1eb342668bc6e5703ee548724ed7273930d"
         },
         "recordedDirentsInputs": {},
         "envVariables": {
