@@ -2638,8 +2638,3 @@ dependencies = [
  "quote",
  "syn 2.0.90",
 ]
-
-[[patch.unused]]
-name = "cc"
-version = "1.1.13"
-source = "git+https://github.com/Asana/cc-rs.git#3cd7c687771196bd2e5d36e5446bfcfa801c08ef"
