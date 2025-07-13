@@ -179,10 +179,10 @@
     "https://bcr.bazel.build/modules/rules_python/0.40.0/MODULE.bazel": "9d1a3cd88ed7d8e39583d9ffe56ae8a244f67783ae89b60caafc9f5cf318ada7",
     "https://bcr.bazel.build/modules/rules_python/0.40.0/source.json": "939d4bd2e3110f27bfb360292986bb79fd8dcefb874358ccd6cdaa7bda029320",
     "https://bcr.bazel.build/modules/rules_rust/0.45.1/MODULE.bazel": "a69d0db3a958fab2c6520961e1b2287afcc8b36690fd31bbc4f6f7391397150d",
-    "https://bcr.bazel.build/modules/rules_rust/0.61.0/MODULE.bazel": "0318a95777b9114c8740f34b60d6d68f9cfef61e2f4b52424ca626213d33787b",
-    "https://bcr.bazel.build/modules/rules_rust/0.61.0/source.json": "d1bc743b5fa2e2abb35c436df7126a53dab0c3f35890ae6841592b2253786a63",
-    "https://bcr.bazel.build/modules/rules_rust_prost/0.61.0/MODULE.bazel": "d6207e765d7937175c0545072caf58469b625fbcac02cea716e6a8b6b0d35108",
-    "https://bcr.bazel.build/modules/rules_rust_prost/0.61.0/source.json": "a6acc1607d09b66c0086c0f735e36b1a81533a9151d26def8e9660d6e13e50eb",
+    "https://bcr.bazel.build/modules/rules_rust/0.62.0/MODULE.bazel": "6a15b57982e278793c684f426e19166e62e73f1bd45fe3b6bcedd0b901177b37",
+    "https://bcr.bazel.build/modules/rules_rust/0.62.0/source.json": "1b3a6551a585ee47cafa21550c5eb87c6f3a56bb9761f9e3421ff1102f220437",
+    "https://bcr.bazel.build/modules/rules_rust_prost/0.62.0/MODULE.bazel": "d9f0572940b5e839ba000de4831831b40cf3c6a0955f687da1c8ef062d08ec68",
+    "https://bcr.bazel.build/modules/rules_rust_prost/0.62.0/source.json": "ec144110ea4cc90c32bb2cb6a04ed9cea75a7bfc5f4908df099fffac7a5c569c",
     "https://bcr.bazel.build/modules/rules_shell/0.2.0/MODULE.bazel": "fda8a652ab3c7d8fee214de05e7a9916d8b28082234e8d2c0094505c5268ed3c",
     "https://bcr.bazel.build/modules/rules_shell/0.3.0/MODULE.bazel": "de4402cd12f4cc8fda2354fce179fdb068c0b9ca1ec2d2b17b3e21b24c1a937b",
     "https://bcr.bazel.build/modules/rules_shell/0.3.0/source.json": "c55ed591aa5009401ddf80ded9762ac32c358d2517ee7820be981e2de9756cf3",
@@ -457,7 +457,7 @@
     },
     "@@rules_rust+//crate_universe:extension.bzl%crate%<root>+crate": {
       "general": {
-        "bzlTransitiveDigest": "W/rbaXU2ynbOCjS/5FvXio2jlghdg7ukmcnvbqE81Go=",
+        "bzlTransitiveDigest": "1qb/TyjrOixpGMmT2BIQTSMsl9/Qz29244JBKQWWBqQ=",
         "usagesDigest": "6m0Ng0xvxGGlKZY6X+xFxCcGvoWW/fuy+XlwbrB7p8o=",
         "recordedFileInputs": {
           "@@//Cargo.lock": "93cc6b29bbb4b5630b8969b51a8a05cffb4a039facd148928bf4b701b54086b6",
