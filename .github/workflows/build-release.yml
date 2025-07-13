@@ -20,7 +20,7 @@ jobs:
             runs-on: ubuntu-24.04-arm
             extension: ""
           - name: windows-amd64
-            runs-on: windows-2019
+            runs-on: windows-2022
             extension: .exe
           - name: osx-amd64
             runs-on: macos-13
