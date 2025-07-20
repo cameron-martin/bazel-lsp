@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/cameron-martin/bazel-lsp/compare/v0.6.4...v0.7.0) (2025-07-20)
+
+
+### Features
+
+* Add support for logging & tracing ([#118](https://github.com/cameron-martin/bazel-lsp/issues/118)) ([f6b0fac](https://github.com/cameron-martin/bazel-lsp/commit/f6b0facf4b0652ecc010c4144cec8d87be62cf1a))
+
 ## [0.6.4](https://github.com/cameron-martin/bazel-lsp/compare/v0.6.3...v0.6.4) (2025-02-11)
 
 
