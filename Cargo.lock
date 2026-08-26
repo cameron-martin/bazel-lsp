@@ -259,7 +259,7 @@ dependencies = [
  "starlark",
  "starlark_lsp",
  "starlark_syntax",
- "thiserror",
+ "thiserror 2.0.20",
  "tonic",
  "tracing",
  "tracing-subscriber",
@@ -1547,7 +1547,7 @@ checksum = "bd283d9651eeda4b2a83a43c1c91b266c40fd76ecd39a50a8c630ae69dc72891"
 dependencies = [
  "getrandom",
  "libredox",
- "thiserror",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -1854,7 +1854,7 @@ dependencies = [
  "static_assertions",
  "strsim 0.10.0",
  "textwrap",
- "thiserror",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -1884,7 +1884,7 @@ dependencies = [
  "serde_json",
  "starlark",
  "starlark_syntax",
- "thiserror",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -1920,7 +1920,7 @@ dependencies = [
  "num-traits",
  "once_cell",
  "starlark_map",
- "thiserror",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -1989,6 +1989,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "syn"
+version = "3.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6275cddf4610d1775e6d1fe9469b2e77d0f39fd98fb7450901b821e0c53649f"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unicode-ident",
+]
+
+[[package]]
 name = "sync_wrapper"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2043,7 +2054,16 @@ version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6aaf5339b578ea85b50e080feb250a3e8ae8cfcdff9a461c9ec2904bc923f52"
 dependencies = [
- "thiserror-impl",
+ "thiserror-impl 1.0.69",
+]
+
+[[package]]
+name = "thiserror"
+version = "2.0.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec86235f5fcc2a73650310756d2ac5b138a5780bbbdfae3eeccec992c435ba4f"
+dependencies = [
+ "thiserror-impl 2.0.20",
 ]
 
 [[package]]
@@ -2055,6 +2075,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.90",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "2.0.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc04cd3e1236dd4a98afca4569f2deb3f120e5422a4023be2cb683f8486292af"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.4",
 ]
 
 [[package]]
