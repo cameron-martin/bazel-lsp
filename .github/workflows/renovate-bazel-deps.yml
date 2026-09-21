@@ -1,0 +1,40 @@
+name: Update Renovate Bazel dependencies
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: renovate-bazel-deps-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  update-lockfile:
+    if: >-
+      github.event.pull_request.user.login == 'renovate[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          token: ${{ secrets.RENOVATE_UPDATE_TOKEN }}
+
+      - name: Update Bazel dependencies
+        run: bazel mod deps
+
+      - name: Commit and push lockfile
+        env:
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          git add MODULE.bazel.lock
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m "chore: update Bazel module lockfile"
+          git push origin "HEAD:refs/heads/$PR_BRANCH"
