@@ -23,7 +23,7 @@ jobs:
             runs-on: windows-2022
             extension: .exe
           - name: osx-amd64
-            runs-on: macos-13
+            runs-on: macos-15-intel
             extension: ""
           - name: osx-arm64
             runs-on: macos-14
