@@ -4,7 +4,7 @@ bazel_dep(name = "rules_rust_prost", version = "0.74.0")
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 rust.toolchain(
     edition = "2021",
-    versions = ["1.84.0"],
+    versions = ["1.98.0"],
 )
 use_repo(rust, "rust_toolchains")
 register_toolchains("@rust_toolchains//:all")
@@ -14,7 +14,7 @@ rust_host_tools = use_extension("@rules_rust//rust:extensions.bzl", "rust_host_t
 use_repo(rust_host_tools, "rust_host_tools")
 
 crate = use_extension(
-    "@rules_rust//crate_universe:extension.bzl",
+    "@rules_rust//crate_universe:extensions.bzl",
     "crate",
     isolate=True
 )
