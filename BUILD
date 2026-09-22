@@ -18,7 +18,6 @@ rust_binary(
         "@crates//:anyhow",
         "@crates//:clap",
         "@crates//:prost",
-        "@crates//:either",
         "@crates//:hex",
         "@crates//:htmd",
         "@crates//:lsp-types",
