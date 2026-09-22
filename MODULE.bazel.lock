@@ -446,7 +446,7 @@
     },
     "@@rules_rust+//crate_universe:extension.bzl%crate%<root>+crate": {
       "general": {
-        "bzlTransitiveDigest": "iSHYSwkE4/7kpZ+qviIcaPnY8T6fObsTXJhDyA2bhcM=",
+        "bzlTransitiveDigest": "L41fRwgT/ACdNyKcyTBL6I7kfGR1G1j8oEnwWKNbd2Q=",
         "usagesDigest": "6m0Ng0xvxGGlKZY6X+xFxCcGvoWW/fuy+XlwbrB7p8o=",
         "recordedInputs": [
           "ENV:CARGO_BAZEL_DEBUG \\0",
@@ -460,7 +460,9 @@
           "REPO_MAPPING:bazel_features+,bazel_features_globals bazel_features++version_extension+bazel_features_globals",
           "REPO_MAPPING:bazel_features+,bazel_features_version bazel_features++version_extension+bazel_features_version",
           "REPO_MAPPING:rules_cc+,bazel_tools bazel_tools",
+          "REPO_MAPPING:rules_cc+,cc_compatibility_proxy rules_cc++compatibility_proxy+cc_compatibility_proxy",
           "REPO_MAPPING:rules_cc+,rules_cc rules_cc+",
+          "REPO_MAPPING:rules_cc++compatibility_proxy+cc_compatibility_proxy,rules_cc rules_cc+",
           "REPO_MAPPING:rules_rust+,bazel_features bazel_features+",
           "REPO_MAPPING:rules_rust+,bazel_skylib bazel_skylib+",
           "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools",
