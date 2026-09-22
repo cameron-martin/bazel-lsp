@@ -443,10 +443,10 @@
         }
       }
     },
-    "@@rules_rust+//crate_universe:extensions.bzl%crate%<root>+crate": {
+    "@@rules_rust+//crate_universe:extension.bzl%crate%<root>+crate": {
       "general": {
-        "bzlTransitiveDigest": "Puq1bPkyVbGqRjFfSWAsiHee89gvzjf05UZKpvZ8WOU=",
-        "usagesDigest": "WzZesVq1n2+wiZG85g4UAr0mLijjtV+Dtgh0Aaq4ElE=",
+        "bzlTransitiveDigest": "iSHYSwkE4/7kpZ+qviIcaPnY8T6fObsTXJhDyA2bhcM=",
+        "usagesDigest": "6m0Ng0xvxGGlKZY6X+xFxCcGvoWW/fuy+XlwbrB7p8o=",
         "recordedInputs": [
           "ENV:CARGO_BAZEL_DEBUG \\0",
           "ENV:CARGO_BAZEL_GENERATOR_SHA256 \\0",

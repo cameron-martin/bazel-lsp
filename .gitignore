@@ -2,4 +2,3 @@
 /bazel-*
 /rust-project.json
 /fixtures/*/root/bazel-*
-/.rules_rust_analyzer

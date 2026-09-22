@@ -81,7 +81,7 @@ impl BazelWorkspace {
         self.external_output_base.join(repository_name)
     }
 
-    pub fn get_repository_names(&self) -> Vec<Cow<'_, str>> {
+    pub fn get_repository_names(&self) -> Vec<Cow<str>> {
         let mut names = Vec::new();
         if let Some(workspace_name) = &self.workspace_name {
             names.push(Cow::Borrowed(workspace_name.as_str()));
