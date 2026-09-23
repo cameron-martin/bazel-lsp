@@ -50,6 +50,15 @@ bazel_dep(
 
 bazel_dep(name = "protobuf", version = "36.2")
 
+# Protobuf's native Rust runtime declares crates without the lockfile required by
+# rules_rust 0.74. We use Prost, so skip those unused crates in transitive builds.
+single_version_override(
+    module_name = "protobuf",
+    version = "36.2",
+    patches = ["//bazel:protobuf.patch"],
+    patch_strip = 1,
+)
+
 register_toolchains("//prost:prost_toolchain")
 
 bazel_dep(name = "hermetic_cc_toolchain", version = "4.0.1")
