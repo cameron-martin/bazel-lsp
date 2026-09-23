@@ -2,7 +2,7 @@ use std::sync::LazyLock;
 
 pub use build_proto::blaze_query::*;
 pub use builtin_proto::builtin::*;
-use htmd::{Element, HtmlToMarkdown};
+use htmd::{element_handler::Handlers, Element, HtmlToMarkdown};
 use starlark::{
     docs::{DocFunction, DocMember, DocParam, DocParams, DocProperty, DocString},
     typing::Ty,
@@ -51,20 +51,22 @@ pub static MISSING_GLOBALS: &'static [&'static str] = &[
 
 static HTML_CONVERTER: LazyLock<htmd::HtmlToMarkdown> = LazyLock::new(|| {
     HtmlToMarkdown::builder()
-        .add_handler(vec!["pre"], |element: Element| {
+        .add_handler(vec!["pre"], |handlers: &dyn Handlers, element: Element| {
+            let content = handlers.walk_children(element.node);
             for attr in element.attrs {
                 if &attr.name.local == "class" && attr.value.to_string() == "language-python" {
-                    return Some(format!("\n```python\n{}\n```\n", element.content));
+                    return Some(format!("\n```python\n{}\n```\n", content.content).into());
                 }
             }
-            Some(element.content.to_string())
+            Some(content)
         })
-        .add_handler(vec!["a"], |element: Element| {
+        .add_handler(vec!["a"], |handlers: &dyn Handlers, element: Element| {
+            let content = handlers.walk_children(element.node);
             for attr in element.attrs {
                 if &attr.name.local == "href" {
                     // For local links, just remove link altogether.
                     if attr.value.starts_with("#") {
-                        return Some(element.content.to_string());
+                        return Some(content);
                     }
 
                     // For relative links, guess the page it points to.
@@ -80,10 +82,10 @@ static HTML_CONVERTER: LazyLock<htmd::HtmlToMarkdown> = LazyLock::new(|| {
                         attr.value.to_string()
                     };
 
-                    return Some(format!("[{}]({})", element.content.to_string(), link));
+                    return Some(format!("[{}]({})", content.content, link).into());
                 }
             }
-            Some(element.content.to_string())
+            Some(content)
         })
         .build()
 });
@@ -219,4 +221,57 @@ fn create_docstring_for_possible_html(html: &str) -> Option<DocString> {
     };
 
     create_docstring(&markdown)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::create_docstring_for_possible_html;
+
+    #[test]
+    fn converts_documentation_links() {
+        for (href, expected) in [
+            ("#attributes", "`rule`"),
+            (
+                "/rules/lib/foo",
+                "[`rule`](https://bazel.build/rules/lib/foo)",
+            ),
+            (
+                "../builtins/foo",
+                "[`rule`](https://bazel.build/rules/lib/builtins/foo)",
+            ),
+            (
+                "https://example.com/foo",
+                "[`rule`](https://example.com/foo)",
+            ),
+        ] {
+            let html = format!("<a href=\"{href}\"><code>rule</code></a>");
+            let docs = create_docstring_for_possible_html(&html).unwrap();
+            assert_eq!(docs.summary, expected, "href: {href}");
+        }
+        let docs = create_docstring_for_possible_html("<a><strong>rule</strong></a>").unwrap();
+        assert_eq!(docs.summary, "**rule**");
+    }
+
+    #[test]
+    fn converts_python_documentation_blocks() {
+        let docs = create_docstring_for_possible_html(
+            "<pre class=\"language-python\">def my_rule():\n    return foo_bar &lt; 2</pre>",
+        )
+        .unwrap();
+        assert_eq!(
+            docs.summary,
+            "```python\ndef my_rule():\n    return foo_bar < 2\n```"
+        );
+
+        let docs = create_docstring_for_possible_html("<pre>foo_bar</pre>").unwrap();
+        assert_eq!(docs.summary, "foo_bar");
+    }
+
+    #[test]
+    fn preserves_markdown_documentation() {
+        let markdown = "Summary with `code`.\n\nMore **details**.";
+        let docs = create_docstring_for_possible_html(markdown).unwrap();
+        assert_eq!(docs.summary, markdown);
+        assert!(create_docstring_for_possible_html("  ").is_none());
+    }
 }
