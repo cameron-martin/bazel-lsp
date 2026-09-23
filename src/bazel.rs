@@ -1127,7 +1127,7 @@ mod tests {
 
         assert_eq!(
             doc.docs.clone().unwrap().summary,
-            "Returns True if the object `x` has an attribute or method of the given `name`, otherwise False. Example:  \n```python\nhasattr(ctx.attr, \"myattr\")\n```"
+            "Returns True if the object `x` has an attribute or method of the given `name`, otherwise False. Example:  \n\n```python\nhasattr(ctx.attr, \"myattr\")\n```"
         );
 
         Ok(())
