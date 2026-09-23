@@ -1,0 +1,12 @@
+diff --git a/MODULE.bazel b/MODULE.bazel
+--- a/MODULE.bazel
++++ b/MODULE.bazel
+@@ -196,7 +196,7 @@
+-crate = use_extension("@rules_rust//crate_universe:extension.bzl", "crate")
++crate = use_extension("@rules_rust//crate_universe:extension.bzl", "crate", dev_dependency = True)
+ crate.spec(
+     package = "googletest",
+     version = ">0.0.0",
+ )
+ crate.spec(
+     package = "linkme",
