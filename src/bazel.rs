@@ -134,10 +134,7 @@ pub(crate) struct BazelContext<Client> {
 
 fn is_workspace_file(uri: &LspUrl) -> bool {
     match uri {
-        LspUrl::File(path) => path
-            .file_name()
-            .map(|name| name == "WORKSPACE" || name == "WORKSPACE.bazel")
-            .unwrap_or(false),
+        LspUrl::File(path) => FileType::from_path(path) == FileType::Workspace,
         LspUrl::Starlark(_) => false,
         LspUrl::Other(_) => false,
     }
@@ -438,7 +435,7 @@ impl<Client: BazelClient> BazelContext<Client> {
     /// Returns protos for bazel globals (like int, str, dir; but also e.g. cc_library, alias,
     /// test_suite etc.).
     // TODO: Consider caching this
-    fn get_bazel_globals(&self, uri: &LspUrl) -> (builtin::BuildLanguage, builtin::Builtins) {
+    fn get_bazel_globals(&self, uri: &LspUrl) -> (builtin::BuildLanguage, Vec<builtin::Value>) {
         let language_proto = self.get_build_language_proto(uri);
 
         let language_proto = language_proto
@@ -450,17 +447,31 @@ impl<Client: BazelClient> BazelContext<Client> {
         // TODO: builtins are also dependent on bazel version, but there is no way to obtain those,
         // see https://github.com/bazel-contrib/vscode-bazel/issues/1.
         let builtins_proto = include_bytes!(env!("BUILTIN_PB"));
-        let builtins = builtin::Builtins::decode(&builtins_proto[..]).unwrap();
+        let file_type = FileType::from_lsp_url(uri);
+        let globals = builtin::Builtins::decode(&builtins_proto[..])
+            .unwrap()
+            .global
+            .into_iter()
+            // TODO: For unkonwn file types (like BUILD.in), should we use only global api context;
+            // guess what's the file type, or just use symbols from all file contexts?
+            .filter(|global| builtin::api_context_applicable_for_file_type(global.api_context(), file_type))
+            .collect();
 
-        (language, builtins)
+        (language, globals)
     }
 
     fn try_get_environment(&self, uri: &LspUrl) -> anyhow::Result<DocModule> {
-        let file_type = FileType::from_lsp_url(uri);
-        let (language, builtins) = self.get_bazel_globals(uri);
+        let (language, globals) = self.get_bazel_globals(uri);
 
-        let members: SmallMap<_, _> = builtin::build_language_to_doc_members(&language)
-            .chain(builtin::builtins_to_doc_members(&builtins, file_type))
+        // TODO: Replace fetching builtins with executing bazel info starlark-environments-proto.
+        //       Commented out for now, as current implementation adds not-relevant symbols.
+        //language
+        //let members: SmallMap<_, _> = builtin::build_language_to_doc_members(&language)
+        //    .chain(builtin::builtins_to_doc_members(&globals))
+        //    .map(|(name, member)| (name, DocItem::Member(member)))
+        //    .collect();
+
+        let members: SmallMap<_, _> = builtin::builtins_to_doc_members(&globals)
             .map(|(name, member)| (name, DocItem::Member(member)))
             .collect();
 
@@ -471,19 +482,13 @@ impl<Client: BazelClient> BazelContext<Client> {
     }
 
     fn get_bazel_globals_names(&self, uri: &LspUrl) -> HashSet<String> {
-        let (language, builtins) = self.get_bazel_globals(uri);
-
-        language
-            .rule
-            .iter()
-            .map(|rule| rule.name.clone())
-            .chain(builtins.global.iter().map(|global| global.name.clone()))
-            .chain(
-                builtin::MISSING_GLOBALS
-                    .iter()
-                    .map(|missing| missing.to_string()),
-            )
-            .collect()
+        let (language, globals) = self.get_bazel_globals(uri);
+        //    .rule
+        //    .iter()
+        //    .map(|rule| rule.name.clone())
+        //    .chain(globals.iter().map(|global| global.name.clone()))
+        //    .collect()
+        globals.iter().map(|global| global.name.clone()).collect()
     }
 }
 
@@ -1094,11 +1099,14 @@ mod tests {
 
         let module = context.get_environment(&LspUrl::File(PathBuf::from("/foo/bar.bzl")));
 
-        assert!(module_contains(&module, "cc_library"));
+        assert!(module_contains(&module, "rule"));
+        assert!(!module_contains(&module, "cc_library"));
 
         let module = context.get_environment(&LspUrl::File(PathBuf::from("/foo/bar/BUILD")));
 
         assert!(module_contains(&module, "cc_library"));
+        assert!(module_contains(&module, "select"));
+        assert!(!module_contains(&module, "rule"));
 
         Ok(())
     }
@@ -1139,7 +1147,7 @@ mod tests {
         let select_doc = get_function_doc("sample.bzl", "select");
         assert_eq!(
             select_doc.docs.clone().unwrap().summary,
-            "`select()` is the helper function that makes a rule attribute configurable. See [build encyclopedia](https://bazel.build/reference/be/functions#select) for details."
+            "`select()` is the helper function that makes a rule attribute [configurable](https://bazel.build/reference/be/common-definitions#configurable-attributes). See [build encyclopedia](https://bazel.build/reference/be/functions#select) for details."
         );
 
         assert_eq!(
@@ -1232,7 +1240,8 @@ mod tests {
             get_function_doc("BUILD", "max").params.args,
             Some(DocParam {
                 name: "args".into(),
-                default_value: None,
+                default_value: Some("".to_string()), // TODO: Why empty string is default value
+                                                     // here?
                 docs: Some(DocString {
                     summary: "The elements to be checked.".into(),
                     details: None,
@@ -1245,7 +1254,7 @@ mod tests {
             get_function_doc("BUILD", "dict").params.kwargs,
             Some(DocParam {
                 name: "kwargs".into(),
-                default_value: None,
+                default_value: Some("".to_string()), // TODO?
                 docs: Some(DocString {
                     summary: "Dictionary of additional entries.".into(),
                     details: None,
@@ -1319,24 +1328,43 @@ mod tests {
         let fixture = TestFixture::new("simple")?;
         let context = fixture.context()?;
 
-        let result = context.parse_file_with_contents(
-            &LspUrl::File(PathBuf::from("/foo.bzl")),
-            "
+        let content = "
 test_suite(name='my_test_suite');
+
+module(name='my_module');
 
 unknown_global_function(42);
 
 a=int(7);
-
-register_toolchains([':my_toolchain']);
 "
-            .to_string(),
-        );
+    .to_string();
 
-        assert_eq!(1, result.diagnostics.len());
+        let result = context.parse_file_with_contents(
+            &LspUrl::File(PathBuf::from("/BUILD")),
+            content.clone());
+
+        assert_eq!(2, result.diagnostics.len());
+        assert_eq!(
+            "Use of undefined variable `module`",
+            result.diagnostics[0].message
+        );
         assert_eq!(
             "Use of undefined variable `unknown_global_function`",
+            result.diagnostics[1].message
+        );
+
+        let result = context.parse_file_with_contents(
+            &LspUrl::File(PathBuf::from("/MODULE.bazel")),
+            content);
+
+        assert_eq!(2, result.diagnostics.len());
+        assert_eq!(
+            "Use of undefined variable `test_suite`",
             result.diagnostics[0].message
+        );
+        assert_eq!(
+            "Use of undefined variable `unknown_global_function`",
+            result.diagnostics[1].message
         );
 
         Ok(())

@@ -1,6 +1,13 @@
 load("@rules_rust_prost//:defs.bzl", "rust_prost_library")
 load(":pbtxt_to_pb.bzl", "pbtxt_to_pb")
 
+proto_library(
+    name = "builtin_proto",
+    srcs = [
+        "builtin.proto",
+    ],
+)
+
 rust_prost_library(
     name = "build_proto_rust",
     proto = "@bazel_tools//src/main/protobuf:build_proto",
@@ -9,7 +16,7 @@ rust_prost_library(
 
 rust_prost_library(
     name = "builtin_proto_rust",
-    proto = "@bazel_tools//src/main/protobuf:builtin_proto",
+    proto = ":builtin_proto",
     visibility = ["//visibility:public"],
 )
 
@@ -30,7 +37,7 @@ pbtxt_to_pb(
 # cat bazel-bin/src/main/java/com/google/devtools/build/lib/builtin.pb | protoc --decode=builtin.Builtins --proto_path src/main/protobuf builtin.proto > builtin.pbtxt
 pbtxt_to_pb(
     name = "builtin",
-    message_proto_library = "@bazel_tools//src/main/protobuf:builtin_proto",
+    message_proto_library = ":builtin_proto",
     message_type = "builtin.Builtins",
     pb = "builtin.pb",
     pbtxt = "builtin.pbtxt",
