@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.0.0](https://github.com/cameron-martin/bazel-lsp/compare/v0.6.4...v1.0.0) (2026-09-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* **deps:** `trait Debug` was a supertrait of `trait Message`. This is no longer required by `prost`. If your code relies on `trait Debug` being implemented for every `impl Message`, you must now explicitly state that you require both Debug and Message. For example: `where M: Debug + Message`
+
+### Features
+
+* Add support for logging & tracing ([#118](https://github.com/cameron-martin/bazel-lsp/issues/118)) ([f6b0fac](https://github.com/cameron-martin/bazel-lsp/commit/f6b0facf4b0652ecc010c4144cec8d87be62cf1a))
+
+
+### Bug Fixes
+
+* **ci:** use supported Intel macOS runner ([#167](https://github.com/cameron-martin/bazel-lsp/issues/167)) ([b67aa91](https://github.com/cameron-martin/bazel-lsp/commit/b67aa91eac68438b0703f035643c7373d05f4224))
+
+
+### Reverts
+
+* revert "deps: update rust" ([b31bf32](https://github.com/cameron-martin/bazel-lsp/commit/b31bf320731e2afd456c7d45ddc0af7769065f0b))
+
+
+### Miscellaneous Chores
+
+* **deps:** update tokio-prost monorepo to 0.14.0 ([#182](https://github.com/cameron-martin/bazel-lsp/issues/182)) ([7c1f6b0](https://github.com/cameron-martin/bazel-lsp/commit/7c1f6b06d67cf46794d7caa8518f3877e949e72b))
+
 ## [0.6.4](https://github.com/cameron-martin/bazel-lsp/compare/v0.6.3...v0.6.4) (2025-02-11)
 
 
