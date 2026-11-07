@@ -3,3 +3,4 @@
 /rust-project.json
 /fixtures/*/root/bazel-*
 /.rules_rust_analyzer
+/.vscode/.rules_rust_analyzer/
