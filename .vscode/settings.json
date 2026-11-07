@@ -1,5 +1,17 @@
 {
-    "rust-analyzer.linkedProjects": [
-        "rust-project.json"
-    ]
+  "rust-analyzer.workspace.discoverConfig": {
+    "command": ["${workspaceFolder}/.vscode/.rules_rust_analyzer/discover_bazel_rust_project.exe", "{arg}"],
+    "filesToWatch": ["BUILD", "BUILD.bazel", "MODULE.bazel", "WORKSPACE", "WORKSPACE.bazel"],
+    "progressLabel": "rules_rust"
+  },
+  "rust-analyzer.server.path": "${workspaceFolder}/.vscode/.rules_rust_analyzer/rust_analyzer.exe",
+  "rust-analyzer.procMacro.server": "${workspaceFolder}/.vscode/.rules_rust_analyzer/rust_analyzer_proc_macro_srv.exe",
+  "rust-analyzer.rustfmt.overrideCommand": ["${workspaceFolder}/.vscode/.rules_rust_analyzer/rustfmt.exe"],
+  "rust-analyzer.check.overrideCommand": ["${workspaceFolder}/.vscode/.rules_rust_analyzer/flycheck.exe", "--saved-file", "$saved_file"],
+  "files.watcherExclude": {
+    "**/bazel-*/**": true
+  },
+  "search.exclude": {
+    "**/bazel-*/**": true
+  }
 }
