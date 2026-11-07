@@ -67,6 +67,7 @@ jobs:
         if: runner.os != 'Windows'
       - name: Build & Test (powershell)
         run: |
+          git config --global core.longpaths true
           $InvocationId = New-Guid
           bazel test //... -c opt --config=ci --invocation_id="$InvocationId"
         if: runner.os == 'Windows'
