@@ -1,3 +1,5 @@
+load("@protobuf//bazel/common:proto_info.bzl", "ProtoInfo")
+
 def _pbtxt_to_pb_impl(ctx):
     descriptors = ctx.attr.message_proto_library[ProtoInfo].transitive_descriptor_sets
     joined_descriptors = ctx.configuration.host_path_separator.join([d.path for d in descriptors.to_list()])
