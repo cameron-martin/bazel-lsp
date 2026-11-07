@@ -204,6 +204,7 @@ fn create_docstring(summary: &str) -> Option<DocString> {
         Some(DocString {
             summary: summary.to_string(),
             details: None,
+            examples: None,
         })
     }
 }
