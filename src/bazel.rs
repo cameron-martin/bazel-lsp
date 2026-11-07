@@ -31,7 +31,6 @@ use std::rc::Rc;
 
 use anyhow::anyhow;
 use lsp_types::CompletionItemKind;
-use lsp_types::Url;
 use prost::Message;
 use starlark::analysis::find_call_name::AstModuleFindCallName;
 use starlark::analysis::AstModuleLint;
@@ -46,7 +45,7 @@ use starlark_lsp::completion::StringCompletionType;
 use starlark_lsp::error::eval_message_to_lsp_diagnostic;
 use starlark_lsp::server::LspContext;
 use starlark_lsp::server::LspEvalResult;
-use starlark_lsp::server::LspUrl;
+use starlark_lsp::server::LspUri;
 use starlark_lsp::server::StringLiteralResult;
 use starlark_syntax::slice_vec_ext::VecExt;
 
@@ -60,10 +59,10 @@ use crate::workspace::BazelWorkspace;
 enum ContextError {
     /// The provided Url was not absolute and it needs to be.
     #[error("Path for URL `{}` was not absolute", .0)]
-    NotAbsolute(LspUrl),
+    NotAbsolute(LspUri),
     /// The scheme provided was not correct or supported.
     #[error("Url `{}` was expected to be of type `{}`", .1, .0)]
-    WrongScheme(String, LspUrl),
+    WrongScheme(String, LspUri),
 }
 
 /// Errors when [`LspContext::resolve_load()`] cannot resolve a given path.
@@ -75,7 +74,7 @@ enum ResolveLoadError {
     MissingCurrentFilePath(Label),
     /// The scheme provided was not correct or supported.
     #[error("Url `{}` was expected to be of type `{}`", .1, .0)]
-    WrongScheme(String, LspUrl),
+    WrongScheme(String, LspUri),
     /// Received a load for an absolute path from the root of the workspace, but the
     /// path to the workspace root was not provided.
     #[error("Label `{}` is absolute from the root of the workspace, but no workspace root was provided", .0)]
@@ -96,7 +95,7 @@ enum RenderLoadError {
     MissingTargetFilename(PathBuf),
     /// The scheme provided was not correct or supported.
     #[error("Urls `{}` and `{}` was expected to be of type `{}`", .1, .2, .0)]
-    WrongScheme(String, LspUrl, LspUrl),
+    WrongScheme(String, LspUri, LspUri),
 }
 
 /// Starting point for resolving filesystem completions.
@@ -132,14 +131,14 @@ pub(crate) struct BazelContext<Client> {
     pub(crate) client: Client,
 }
 
-fn is_workspace_file(uri: &LspUrl) -> bool {
+fn is_workspace_file(uri: &LspUri) -> bool {
     match uri {
-        LspUrl::File(path) => path
+        LspUri::File(path) => path
             .file_name()
             .map(|name| name == "WORKSPACE" || name == "WORKSPACE.bazel")
             .unwrap_or(false),
-        LspUrl::Starlark(_) => false,
-        LspUrl::Other(_) => false,
+        LspUri::Starlark(_) => false,
+        LspUri::Other(_) => false,
     }
 }
 
@@ -152,7 +151,7 @@ impl<Client: BazelClient> BazelContext<Client> {
         })
     }
 
-    fn lint_module(&self, uri: &LspUrl, ast: &AstModule) -> Vec<EvalMessage> {
+    fn lint_module(&self, uri: &LspUri, ast: &AstModule) -> Vec<EvalMessage> {
         let globals = self.get_bazel_globals_names(uri);
 
         let is_workspace_file = is_workspace_file(uri);
@@ -170,7 +169,7 @@ impl<Client: BazelClient> BazelContext<Client> {
     fn workspace<P: AsRef<Path>>(
         &self,
         workspace_dir: Option<P>,
-        current_file: &LspUrl,
+        current_file: &LspUri,
     ) -> anyhow::Result<Option<Rc<BazelWorkspace>>> {
         let mut workspaces = self.workspaces.borrow_mut();
 
@@ -197,8 +196,8 @@ impl<Client: BazelClient> BazelContext<Client> {
         }
     }
 
-    fn infer_workspace_dir(&self, current_file: &LspUrl) -> io::Result<Option<PathBuf>> {
-        if let LspUrl::File(path) = current_file {
+    fn infer_workspace_dir(&self, current_file: &LspUri) -> io::Result<Option<PathBuf>> {
+        if let LspUri::File(path) = current_file {
             for dir in path.ancestors().skip(1) {
                 let file = dir.join("DO_NOT_BUILD_HERE");
                 if file.exists() {
@@ -216,10 +215,10 @@ impl<Client: BazelClient> BazelContext<Client> {
     fn repo_mapping_for_file(
         &self,
         workspace: &BazelWorkspace,
-        current_file: &LspUrl,
+        current_file: &LspUri,
     ) -> anyhow::Result<HashMap<String, String>> {
         let current_repository = workspace
-            .get_repository_for_lspurl(current_file)
+            .get_repository_for_lspuri(current_file)
             .unwrap_or(Cow::Borrowed(""));
 
         self.client
@@ -230,7 +229,7 @@ impl<Client: BazelClient> BazelContext<Client> {
     fn resolve_folder<'a>(
         &self,
         label: &Label,
-        current_file: &LspUrl,
+        current_file: &LspUri,
         workspace: Option<&BazelWorkspace>,
     ) -> anyhow::Result<PathBuf> {
         // Find the root we're resolving from. There's quite a few cases to consider here:
@@ -248,7 +247,7 @@ impl<Client: BazelClient> BazelContext<Client> {
             // root is. Fall back to the `workspace_root` otherwise.
             None => {
                 if let Some(repository_name) =
-                    workspace.and_then(|ws| ws.get_repository_for_lspurl(current_file))
+                    workspace.and_then(|ws| ws.get_repository_for_lspuri(current_file))
                 {
                     workspace
                         .map(|ws| ws.get_repository_path(&repository_name))
@@ -300,7 +299,7 @@ impl<Client: BazelClient> BazelContext<Client> {
             // If we don't have a package, this is relative to the current file,
             // so resolve relative paths from the current file.
             match current_file {
-                LspUrl::File(current_file_path) => {
+                LspUri::File(current_file_path) => {
                     let current_file_dir = current_file_path.parent();
                     match current_file_dir {
                         Some(current_file_dir) => Ok(current_file_dir.to_owned()),
@@ -318,7 +317,7 @@ impl<Client: BazelClient> BazelContext<Client> {
     fn get_filesystem_entries(
         &self,
         from: FilesystemCompletionRoot,
-        current_file: &LspUrl,
+        current_file: &LspUri,
         workspace: Option<&BazelWorkspace>,
         options: &FilesystemCompletionOptions,
         results: &mut Vec<StringCompletionResult>,
@@ -427,7 +426,7 @@ impl<Client: BazelClient> BazelContext<Client> {
         )
     }
 
-    fn get_build_language_proto(&self, uri: &LspUrl) -> anyhow::Result<Vec<u8>> {
+    fn get_build_language_proto(&self, uri: &LspUri) -> anyhow::Result<Vec<u8>> {
         let workspace = self
             .workspace::<PathBuf>(None, uri)?
             .ok_or_else(|| anyhow!("Cannot find workspace"))?;
@@ -438,7 +437,7 @@ impl<Client: BazelClient> BazelContext<Client> {
     /// Returns protos for bazel globals (like int, str, dir; but also e.g. cc_library, alias,
     /// test_suite etc.).
     // TODO: Consider caching this
-    fn get_bazel_globals(&self, uri: &LspUrl) -> (builtin::BuildLanguage, builtin::Builtins) {
+    fn get_bazel_globals(&self, uri: &LspUri) -> (builtin::BuildLanguage, builtin::Builtins) {
         let language_proto = self.get_build_language_proto(uri);
 
         let language_proto = language_proto
@@ -455,8 +454,8 @@ impl<Client: BazelClient> BazelContext<Client> {
         (language, builtins)
     }
 
-    fn try_get_environment(&self, uri: &LspUrl) -> anyhow::Result<DocModule> {
-        let file_type = FileType::from_lsp_url(uri);
+    fn try_get_environment(&self, uri: &LspUri) -> anyhow::Result<DocModule> {
+        let file_type = FileType::from_lsp_uri(uri);
         let (language, builtins) = self.get_bazel_globals(uri);
 
         let members: SmallMap<_, _> = builtin::build_language_to_doc_members(&language)
@@ -470,7 +469,7 @@ impl<Client: BazelClient> BazelContext<Client> {
         })
     }
 
-    fn get_bazel_globals_names(&self, uri: &LspUrl) -> HashSet<String> {
+    fn get_bazel_globals_names(&self, uri: &LspUri) -> HashSet<String> {
         let (language, builtins) = self.get_bazel_globals(uri);
 
         language
@@ -487,10 +486,10 @@ impl<Client: BazelClient> BazelContext<Client> {
     }
 }
 
-impl<Client: BazelClient> LspContext for BazelContext<Client> {
-    fn parse_file_with_contents(&self, uri: &LspUrl, content: String) -> LspEvalResult {
+impl<Client: BazelClient> BazelContext<Client> {
+    fn parse_file_with_contents(&self, uri: &LspUri, content: String) -> LspEvalResult {
         match uri {
-            LspUrl::File(path) => {
+            LspUri::File(path) => {
                 match AstModule::parse(&path.to_string_lossy(), content, &Dialect::Extended) {
                     Ok(ast) => {
                         let diagnostics = self
@@ -519,9 +518,9 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
     fn resolve_load(
         &self,
         path: &str,
-        current_file: &LspUrl,
+        current_file: &LspUri,
         workspace_root: Option<&Path>,
-    ) -> anyhow::Result<LspUrl> {
+    ) -> anyhow::Result<LspUri> {
         let label = Label::parse(path)?;
         let workspace = self.workspace(workspace_root, current_file)?;
 
@@ -530,7 +529,7 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
         // Try the presumed filename first, and check if it exists.
         let presumed_path = folder.join(label.name);
         if presumed_path.exists() {
-            return Ok(Url::from_file_path(presumed_path).unwrap().try_into()?);
+            return Ok(LspUri::File(presumed_path));
         }
 
         // If the presumed filename doesn't exist, try to find a build file from the build system
@@ -538,7 +537,7 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
         for build_file_name in FileType::BUILD_FILE_NAMES {
             let path = folder.join(build_file_name);
             if path.exists() {
-                return Ok(Url::from_file_path(path).unwrap().try_into()?);
+                return Ok(LspUri::File(path));
             }
         }
 
@@ -547,15 +546,15 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
 
     fn render_as_load(
         &self,
-        target: &LspUrl,
-        current_file: &LspUrl,
+        target: &LspUri,
+        current_file: &LspUri,
         workspace_root: Option<&Path>,
     ) -> anyhow::Result<String> {
         let workspace = self.workspace(workspace_root, current_file)?;
 
         match (target, current_file) {
             // Check whether the target and the current file are in the same package.
-            (LspUrl::File(target_path), LspUrl::File(current_file_path)) if matches!((target_path.parent(), current_file_path.parent()), (Some(a), Some(b)) if a == b) =>
+            (LspUri::File(target_path), LspUri::File(current_file_path)) if matches!((target_path.parent(), current_file_path.parent()), (Some(a), Some(b)) if a == b) =>
             {
                 // Then just return a relative path.
                 let target_filename = target_path.file_name();
@@ -564,7 +563,7 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
                     None => Err(RenderLoadError::MissingTargetFilename(target_path.clone()).into()),
                 }
             }
-            (LspUrl::File(target_path), _) => {
+            (LspUri::File(target_path), _) => {
                 // Try to find a repository that contains the target, as well as the path to the
                 // target relative to the repository root. If we can't find a repository, we'll
                 // try to resolve the target relative to the workspace root. If we don't have a
@@ -608,7 +607,7 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
     fn resolve_string_literal(
         &self,
         literal: &str,
-        current_file: &LspUrl,
+        current_file: &LspUri,
         workspace_root: Option<&Path>,
     ) -> anyhow::Result<Option<StringLiteralResult>> {
         self.resolve_load(literal, current_file, workspace_root)
@@ -618,7 +617,7 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
                 let same_filename = original_target_name == path_file_name;
 
                 Some(StringLiteralResult {
-                    url: url.clone(),
+                    uri: url.clone(),
                     // If the target name is the same as the original target name, we don't need to
                     // do anything. Otherwise, we need to find the function call in the target file
                     // that has a `name` parameter with the same value as the original target name.
@@ -636,9 +635,9 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
             })
     }
 
-    fn get_load_contents(&self, uri: &LspUrl) -> anyhow::Result<Option<String>> {
+    fn get_load_contents(&self, uri: &LspUri) -> anyhow::Result<Option<String>> {
         match uri {
-            LspUrl::File(path) => match path.is_absolute() {
+            LspUri::File(path) => match path.is_absolute() {
                 true => match fs::read_to_string(path) {
                     Ok(contents) => Ok(Some(contents)),
                     Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
@@ -646,26 +645,26 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
                 },
                 false => Err(ContextError::NotAbsolute(uri.clone()).into()),
             },
-            LspUrl::Starlark(_) => Ok(None),
+            LspUri::Starlark(_) => Ok(None),
             _ => Err(ContextError::WrongScheme("file://".to_owned(), uri.clone()).into()),
         }
     }
 
-    fn get_environment(&self, uri: &LspUrl) -> DocModule {
+    fn get_environment(&self, uri: &LspUri) -> DocModule {
         self.try_get_environment(uri).unwrap_or_default()
     }
 
-    fn get_url_for_global_symbol(
+    fn get_uri_for_global_symbol(
         &self,
-        _current_file: &LspUrl,
+        _current_file: &LspUri,
         _symbol: &str,
-    ) -> anyhow::Result<Option<LspUrl>> {
+    ) -> anyhow::Result<Option<LspUri>> {
         Ok(None)
     }
 
     fn get_string_completion_options(
         &self,
-        document_uri: &LspUrl,
+        document_uri: &LspUri,
         kind: StringCompletionType,
         current_value: &str,
         workspace_root: Option<&Path>,
@@ -774,9 +773,80 @@ impl<Client: BazelClient> LspContext for BazelContext<Client> {
     }
 }
 
+// Keep structured errors internally and format them at the LSP context boundary.
+impl<Client: BazelClient> LspContext for BazelContext<Client> {
+    fn parse_file_with_contents(&self, uri: &LspUri, content: String) -> LspEvalResult {
+        BazelContext::parse_file_with_contents(self, uri, content)
+    }
+
+    fn resolve_load(
+        &self,
+        path: &str,
+        current_file: &LspUri,
+        workspace_root: Option<&Path>,
+    ) -> Result<LspUri, String> {
+        BazelContext::resolve_load(self, path, current_file, workspace_root)
+            .map_err(|e| e.to_string())
+    }
+
+    fn render_as_load(
+        &self,
+        target: &LspUri,
+        current_file: &LspUri,
+        workspace_root: Option<&Path>,
+    ) -> Result<String, String> {
+        BazelContext::render_as_load(self, target, current_file, workspace_root)
+            .map_err(|e| e.to_string())
+    }
+
+    fn resolve_string_literal(
+        &self,
+        literal: &str,
+        current_file: &LspUri,
+        workspace_root: Option<&Path>,
+    ) -> Result<Option<StringLiteralResult>, String> {
+        BazelContext::resolve_string_literal(self, literal, current_file, workspace_root)
+            .map_err(|e| e.to_string())
+    }
+
+    fn get_load_contents(&self, uri: &LspUri) -> Result<Option<String>, String> {
+        BazelContext::get_load_contents(self, uri).map_err(|e| e.to_string())
+    }
+
+    fn get_environment(&self, uri: &LspUri) -> DocModule {
+        BazelContext::get_environment(self, uri)
+    }
+
+    fn get_uri_for_global_symbol(
+        &self,
+        current_file: &LspUri,
+        symbol: &str,
+    ) -> Result<Option<LspUri>, String> {
+        BazelContext::get_uri_for_global_symbol(self, current_file, symbol)
+            .map_err(|e| e.to_string())
+    }
+
+    fn get_string_completion_options(
+        &self,
+        document_uri: &LspUri,
+        kind: StringCompletionType,
+        current_value: &str,
+        workspace_root: Option<&Path>,
+    ) -> Result<Vec<StringCompletionResult>, String> {
+        BazelContext::get_string_completion_options(
+            self,
+            document_uri,
+            kind,
+            current_value,
+            workspace_root,
+        )
+        .map_err(|e| e.to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use lsp_types::{NumberOrString, Url};
+    use lsp_types::NumberOrString;
     use std::path::PathBuf;
 
     use lsp_types::CompletionItemKind;
@@ -787,7 +857,7 @@ mod tests {
     };
     use starlark_lsp::{
         completion::{StringCompletionResult, StringCompletionType},
-        server::{LspContext, LspUrl},
+        server::{LspContext, LspUri},
     };
 
     use crate::test_fixture::TestFixture;
@@ -797,18 +867,30 @@ mod tests {
         let fixture = TestFixture::new("simple")?;
         let context = fixture.context()?;
 
-        let url = context.resolve_load(
+        let url = LspContext::resolve_load(
+            &context,
             "//:foo.bzl",
-            &LspUrl::File(fixture.external_dir("foo").join("BUILD")),
+            &LspUri::File(fixture.external_dir("foo").join("BUILD")),
             None,
-        )?;
+        )
+        .map_err(anyhow::Error::msg)?;
 
         assert_eq!(
             url,
-            Url::from_file_path(fixture.external_dir("foo").join("foo.bzl"))
-                .unwrap()
-                .try_into()?
+            LspUri::File(fixture.external_dir("foo").join("foo.bzl"))
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn lsp_context_reports_relative_file_errors() -> anyhow::Result<()> {
+        let fixture = TestFixture::new("simple")?;
+        let context = fixture.context()?;
+        let uri = LspUri::File(PathBuf::from("relative.bzl"));
+
+        let error = LspContext::get_load_contents(&context, &uri).unwrap_err();
+        assert_eq!(error, "Path for URL `file://relative.bzl` was not absolute");
 
         Ok(())
     }
@@ -820,15 +902,13 @@ mod tests {
 
         let url = context.resolve_load(
             "@bar//:bar.bzl",
-            &LspUrl::File(fixture.external_dir("foo").join("BUILD")),
+            &LspUri::File(fixture.external_dir("foo").join("BUILD")),
             None,
         )?;
 
         assert_eq!(
             url,
-            Url::from_file_path(fixture.external_dir("bar").join("bar.bzl"))
-                .unwrap()
-                .try_into()?
+            LspUri::File(fixture.external_dir("bar").join("bar.bzl"))
         );
 
         Ok(())
@@ -841,15 +921,13 @@ mod tests {
 
         let url = context.resolve_load(
             "@foo//:foo.bzl",
-            &LspUrl::File(fixture.workspace_root().join("BUILD")),
+            &LspUri::File(fixture.workspace_root().join("BUILD")),
             Some(&fixture.workspace_root()),
         )?;
 
         assert_eq!(
             url,
-            Url::from_file_path(fixture.external_dir("foo").join("foo.bzl"))
-                .unwrap()
-                .try_into()?
+            LspUri::File(fixture.external_dir("foo").join("foo.bzl"))
         );
 
         Ok(())
@@ -871,20 +949,18 @@ mod tests {
 
         let url = context.resolve_load(
             "@rules_rust//rust:defs.bzl",
-            &LspUrl::File(fixture.workspace_root().join("BUILD")),
+            &LspUri::File(fixture.workspace_root().join("BUILD")),
             Some(&fixture.workspace_root()),
         )?;
 
         assert_eq!(
             url,
-            Url::from_file_path(
+            LspUri::File(
                 fixture
                     .external_dir("rules_rust~0.36.2")
                     .join("rust")
                     .join("defs.bzl")
             )
-            .unwrap()
-            .try_into()?
         );
 
         assert_eq!(context.client.profile.borrow().dump_repo_mapping, 1);
@@ -907,7 +983,7 @@ mod tests {
             .build()?;
 
         let completions = context.get_string_completion_options(
-            &LspUrl::File(fixture.workspace_root().join("BUILD")),
+            &LspUri::File(fixture.workspace_root().join("BUILD")),
             StringCompletionType::String,
             "@rules_ru",
             Some(&fixture.workspace_root()),
@@ -943,7 +1019,7 @@ mod tests {
             .build()?;
 
         let completions = context.get_string_completion_options(
-            &LspUrl::File(fixture.workspace_root().join("BUILD")),
+            &LspUri::File(fixture.workspace_root().join("BUILD")),
             StringCompletionType::LoadPath,
             "@rules_rust//",
             Some(&fixture.workspace_root()),
@@ -972,7 +1048,7 @@ mod tests {
         let context = fixture.context()?;
 
         let completions = context.get_string_completion_options(
-            &LspUrl::File(fixture.workspace_root().join("BUILD")),
+            &LspUri::File(fixture.workspace_root().join("BUILD")),
             StringCompletionType::String,
             "",
             Some(&fixture.workspace_root()),
@@ -1002,7 +1078,7 @@ mod tests {
         let context = fixture.context()?;
 
         let completions = context.get_string_completion_options(
-            &LspUrl::File(fixture.workspace_root().join("BUILD")),
+            &LspUri::File(fixture.workspace_root().join("BUILD")),
             StringCompletionType::String,
             "//foo:",
             Some(&fixture.workspace_root()),
@@ -1035,7 +1111,7 @@ mod tests {
             .build()?;
 
         let completions = context.get_string_completion_options(
-            &LspUrl::File(fixture.workspace_root().join("BUILD")),
+            &LspUri::File(fixture.workspace_root().join("BUILD")),
             StringCompletionType::String,
             "//foo:",
             Some(&fixture.workspace_root()),
@@ -1070,12 +1146,12 @@ mod tests {
             module.members.iter().any(|(member, _)| member == value)
         }
 
-        let module = context.get_environment(&LspUrl::File(PathBuf::from("/foo/bar.bzl")));
+        let module = context.get_environment(&LspUri::File(PathBuf::from("/foo/bar.bzl")));
 
         assert!(!module_contains(&module, "glob"));
         assert!(module_contains(&module, "range"));
 
-        let module = context.get_environment(&LspUrl::File(PathBuf::from("/foo/bar/BUILD")));
+        let module = context.get_environment(&LspUri::File(PathBuf::from("/foo/bar/BUILD")));
 
         assert!(module_contains(&module, "glob"));
         assert!(module_contains(&module, "range"));
@@ -1092,11 +1168,11 @@ mod tests {
             module.members.iter().any(|(member, _)| member == value)
         }
 
-        let module = context.get_environment(&LspUrl::File(PathBuf::from("/foo/bar.bzl")));
+        let module = context.get_environment(&LspUri::File(PathBuf::from("/foo/bar.bzl")));
 
         assert!(module_contains(&module, "cc_library"));
 
-        let module = context.get_environment(&LspUrl::File(PathBuf::from("/foo/bar/BUILD")));
+        let module = context.get_environment(&LspUri::File(PathBuf::from("/foo/bar/BUILD")));
 
         assert!(module_contains(&module, "cc_library"));
 
@@ -1107,7 +1183,7 @@ mod tests {
         let fixture = TestFixture::new("simple").unwrap();
         let context = fixture.context().unwrap();
 
-        let module = context.get_environment(&LspUrl::File(PathBuf::from(file_path)));
+        let module = context.get_environment(&LspUri::File(PathBuf::from(file_path)));
 
         let (_, function) = module
             .members
@@ -1151,6 +1227,7 @@ mod tests {
                     docs: Some(DocString {
                       summary: "A dict that maps configuration conditions to values. Each key is a [Label](https://bazel.build/rules/lib/builtins/Label.html) or a label string that identifies a config\\_setting or constraint\\_value instance. See the [documentation on macros](https://bazel.build/rules/macros#label-resolution) for when to use a Label instead of a string.".into(),
                         details: None,
+                        examples: None,
                     }),
                     typ: Ty::any(),
                 },
@@ -1160,6 +1237,7 @@ mod tests {
                     docs: Some(DocString {
                         summary: "Optional custom error to report if no condition matches.".into(),
                         details: None,
+                        examples: None,
                     }),
                     typ: Ty::any(),
                 },
@@ -1189,6 +1267,7 @@ mod tests {
                     docs: Some(DocString {
                         summary: "The list of glob patterns to include.".into(),
                         details: None,
+                        examples: None,
                     }),
                     typ: Ty::any(),
                 },
@@ -1198,6 +1277,7 @@ mod tests {
                     docs: Some(DocString {
                         summary: "The list of glob patterns to exclude.".into(),
                         details: None,
+                        examples: None,
                     }),
                     typ: Ty::any(),
                 },
@@ -1207,6 +1287,7 @@ mod tests {
                     docs: Some(DocString {
                         summary: "A flag whether to exclude directories or not.".into(),
                         details: None,
+                        examples: None,
                     }),
                     typ: Ty::any(),
                 },
@@ -1217,6 +1298,7 @@ mod tests {
                     docs: Some(DocString {
                         summary: "Whether we allow glob patterns to match nothing. If `allow_empty` is False, each individual include pattern must match something and also the final result must be non-empty (after the matches of the `exclude` patterns are excluded).".into(),
                         details: None,
+                        examples: None,
                     }),
                     typ: Ty::any(),
                 },
@@ -1236,6 +1318,7 @@ mod tests {
                 docs: Some(DocString {
                     summary: "The elements to be checked.".into(),
                     details: None,
+                    examples: None,
                 }),
                 typ: Ty::any(),
             })
@@ -1249,6 +1332,7 @@ mod tests {
                 docs: Some(DocString {
                     summary: "Dictionary of additional entries.".into(),
                     details: None,
+                    examples: None,
                 }),
                 typ: Ty::any(),
             })
@@ -1265,7 +1349,7 @@ mod tests {
         let fixture = TestFixture::new("simple")?;
         let context = fixture.context()?;
 
-        let module = context.get_environment(&LspUrl::File(PathBuf::from("/foo/bar/defs.bzl")));
+        let module = context.get_environment(&LspUri::File(PathBuf::from("/foo/bar/defs.bzl")));
 
         fn validate_doc_item(item: &DocItem) {
             match item {
@@ -1320,7 +1404,7 @@ mod tests {
         let context = fixture.context()?;
 
         let result = context.parse_file_with_contents(
-            &LspUrl::File(PathBuf::from("/foo.bzl")),
+            &LspUri::File(PathBuf::from("/foo.bzl")),
             "
 test_suite(name='my_test_suite');
 
@@ -1357,7 +1441,7 @@ register_toolchains([':my_toolchain']);
 
         for (name, expected_lint) in files {
             let result = context.parse_file_with_contents(
-                &LspUrl::File(PathBuf::from(name)),
+                &LspUri::File(PathBuf::from(name)),
                 "
 test_suite(name='my_test_suite');
 

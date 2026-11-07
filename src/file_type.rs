@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use starlark_lsp::server::LspUrl;
+use starlark_lsp::server::LspUri;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum FileType {
@@ -13,8 +13,8 @@ impl FileType {
     pub const BUILD_FILE_NAMES: [&'static str; 2] = ["BUILD", "BUILD.bazel"];
     const LIBRARY_EXTENSIONS: [&'static str; 1] = ["bzl"];
 
-    pub fn from_lsp_url(url: &LspUrl) -> Self {
-        if let LspUrl::File(path) = url {
+    pub fn from_lsp_uri(url: &LspUri) -> Self {
+        if let LspUri::File(path) = url {
             Self::from_path(path)
         } else {
             FileType::Unknown

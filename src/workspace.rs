@@ -5,7 +5,7 @@ use std::{
 };
 
 use ring::digest;
-use starlark_lsp::server::LspUrl;
+use starlark_lsp::server::LspUri;
 
 use crate::client::BazelInfo;
 
@@ -70,9 +70,9 @@ impl BazelWorkspace {
             })
     }
 
-    pub fn get_repository_for_lspurl<'a>(&'a self, url: &'a LspUrl) -> Option<Cow<'a, str>> {
+    pub fn get_repository_for_lspuri<'a>(&'a self, url: &'a LspUri) -> Option<Cow<'a, str>> {
         match url {
-            LspUrl::File(path) => self.get_repository_for_path(path).map(|(repo, _)| repo),
+            LspUri::File(path) => self.get_repository_for_path(path).map(|(repo, _)| repo),
             _ => None,
         }
     }
