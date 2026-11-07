@@ -26,7 +26,7 @@ jobs:
             runs-on: macos-15-intel
             extension: ""
           - name: osx-arm64
-            runs-on: macos-14
+            runs-on: macos-15
             extension: ""
       fail-fast: false
 
